@@ -14,6 +14,7 @@ from Routes.substationRoutes import substationApi
 from Routes.consumerRoutes import consumerApi
 from Routes.dtrRoutes import dtrApi
 from Routes.BackdownRoutes import backDownApi
+from Routes.lowTensionRoutes import lowTensionApi
 import mysql.connector
 import json
 from dotenv import load_dotenv
@@ -47,6 +48,7 @@ app.register_blueprint(substationApi, url_prefix='/substation')
 app.register_blueprint(consumerApi, url_prefix='/consumer')
 app.register_blueprint(dtrApi, url_prefix='/dtr')
 app.register_blueprint(backDownApi, url_prefix='/backdown')
+app.register_blueprint(lowTensionApi, url_prefix='/low-tension')
 
 
 @app.route('/dashboard', methods=['GET'])

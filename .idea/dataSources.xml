@@ -8,18 +8,18 @@
       <jdbc-url>jdbc:mariadb://localhost:3306/guvnl_dev</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
-    <data-source source="LOCAL" name="utho" uuid="d3cc430a-0639-4110-9194-eb25ce518f30">
-      <driver-ref>mysql.8</driver-ref>
+    <data-source source="LOCAL" name="guvnl_consumers@localhost" uuid="96ec9adf-52c7-447d-bc24-d6199b003bf0">
+      <driver-ref>mariadb</driver-ref>
       <synchronize>true</synchronize>
-      <jdbc-driver>com.mysql.cj.jdbc.Driver</jdbc-driver>
-      <jdbc-url>jdbc:mysql://public-primary-mysql-inmumbaizone2-189017-1638097.db.onutho.com:3306/guvnldev</jdbc-url>
+      <jdbc-driver>org.mariadb.jdbc.Driver</jdbc-driver>
+      <jdbc-url>jdbc:mariadb://localhost:3306/guvnl_consumers</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
-    <data-source source="LOCAL" name="Hostinger@guvnldev" uuid="b40ac952-490a-4dde-987e-1527a421622d">
-      <driver-ref>mysql.8</driver-ref>
+    <data-source source="LOCAL" name="powercasting@localhost" uuid="f3798d36-10d9-4286-88e9-ccf3db65f150">
+      <driver-ref>mongo.4</driver-ref>
       <synchronize>true</synchronize>
-      <jdbc-driver>com.mysql.cj.jdbc.Driver</jdbc-driver>
-      <jdbc-url>jdbc:mysql://69.62.74.149:3306/guvnldev</jdbc-url>
+      <jdbc-driver>com.dbschema.MongoJdbcDriver</jdbc-driver>
+      <jdbc-url>mongodb://localhost:27017/powercasting</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
   </component>
