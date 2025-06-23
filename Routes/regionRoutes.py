@@ -15,7 +15,7 @@ def get_db_connection():
         database=os.getenv('DB_NAMES').split(',')[0]  # Using guvnl_consumers for region routes
     )
 
-@regionApi.route('/region/all', methods=['GET'])
+@regionApi.route('/all', methods=['GET'])
 def get_all_regions():
     try:
         conn = get_db_connection()
