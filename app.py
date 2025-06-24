@@ -14,7 +14,6 @@ from Routes.substationRoutes import substationApi
 from Routes.consumerRoutes import consumerApi
 from Routes.dtrRoutes import dtrApi
 from Routes.BackdownRoutes import backDownApi
-from Routes.lowTensionRoutes import lowTensionApi
 import mysql.connector
 import json
 from dotenv import load_dotenv
@@ -34,21 +33,20 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})  # Enable CORS for all routes and origins
 
 # Register the Blueprint
-app.register_blueprint(procurementAPI, url_prefix='/procurement')
-app.register_blueprint(plantAPI, url_prefix='/plant')
-app.register_blueprint(demandApi, url_prefix='/demand')
-app.register_blueprint(bankingAPI, url_prefix='/banking')
-app.register_blueprint(iexApi, url_prefix='/iex')
-app.register_blueprint(availabilityAPI, url_prefix='/availability')
-app.register_blueprint(regionApi, url_prefix='/region')
-app.register_blueprint(feederApi, url_prefix='/feeder')
-app.register_blueprint(powerTheftApi, url_prefix='/power-theft')
-app.register_blueprint(divisionApi, url_prefix='/division')
-app.register_blueprint(substationApi, url_prefix='/substation')
-app.register_blueprint(consumerApi, url_prefix='/consumer')
-app.register_blueprint(dtrApi, url_prefix='/dtr')
-app.register_blueprint(backDownApi, url_prefix='/backdown')
-app.register_blueprint(lowTensionApi, url_prefix='/low-tension')
+app.register_blueprint(procurementAPI, url_prefix='/procurement')  # Registering the Procurement API
+app.register_blueprint(plantAPI, url_prefix='/plant')  # Registering the Plant API
+app.register_blueprint(demandApi, url_prefix='/demand')  # Registering the Demand API
+app.register_blueprint(bankingAPI, url_prefix='/banking')  # Registering the Banking API
+app.register_blueprint(iexApi, url_prefix='/iex')  # Registering the IEX API
+app.register_blueprint(availabilityAPI, url_prefix='/availability')  # Registering the Plant availability factor API
+app.register_blueprint(backDownApi, url_prefix='/backdown')  # Registering the Backdown API
+app.register_blueprint(regionApi, url_prefix='/region')  # Registering the Region API
+app.register_blueprint(divisionApi, url_prefix='/division')  # Registering the Division API
+app.register_blueprint(substationApi, url_prefix='/substation')  # Registering the Substation API
+app.register_blueprint(feederApi, url_prefix='/feeder')  # Registering the Feeder API
+app.register_blueprint(dtrApi, url_prefix='/dtr')  # Registering the DTR API
+app.register_blueprint(consumerApi, url_prefix='/consumer')  # Registering the Consumer API
+app.register_blueprint(powerTheftApi, url_prefix='/power-theft')  # Registering the Power Theft API
 
 
 @app.route('/dashboard', methods=['GET'])
