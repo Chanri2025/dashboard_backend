@@ -15,7 +15,7 @@ def get_db_connection():
         database=os.getenv('DB_NAMES').split(',')[0]  # Using guvnl_consumers for division routes
     )
 
-@divisionApi.route('/division/all', methods=['GET'])
+@divisionApi.route('/all', methods=['GET'])
 def get_all_divisions():
     try:
         conn = get_db_connection()
@@ -28,7 +28,7 @@ def get_all_divisions():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@divisionApi.route('/division/by-region/<region_id>', methods=['GET'])
+@divisionApi.route('/by-region/<region_id>', methods=['GET'])
 def get_divisions_by_region(region_id):
     try:
         conn = get_db_connection()
