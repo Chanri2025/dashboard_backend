@@ -477,6 +477,36 @@
 										}
 									},
 									"response": []
+								},
+								{
+									"name": "Get DTR List",
+									"id": "28164213-47c2e6f0-8738-4204-9391-b51c5ee2b304",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "noauth"
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://127.0.0.1:5000/dtr/",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "5000",
+											"path": [
+												"dtr",
+												""
+											]
+										}
+									},
+									"response": []
 								}
 							],
 							"id": "28164213-1441cde7-8b1c-4c9d-80d0-2f073387a3ff"
