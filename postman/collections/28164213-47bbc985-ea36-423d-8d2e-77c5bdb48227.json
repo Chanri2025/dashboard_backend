@@ -721,6 +721,36 @@
 										}
 									},
 									"response": []
+								},
+								{
+									"name": "Get Single Feeder",
+									"id": "28164213-d0c1c29c-867f-4e12-aa4a-ab21bcd6c1da",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "noauth"
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://127.0.0.1:5000/feeder/FEEDER1",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "5000",
+											"path": [
+												"feeder",
+												"FEEDER1"
+											]
+										}
+									},
+									"response": []
 								}
 							],
 							"id": "28164213-e973d84a-4c9e-41e4-977d-80c4964afdf7"
