@@ -2,18 +2,13 @@ from flask import Blueprint, jsonify, request
 import mysql.connector
 from dotenv import load_dotenv
 import os
-import json
 from bson.decimal128 import Decimal128
 from datetime import datetime
 from pymongo import MongoClient
 
-# Create a Blueprint
+load_dotenv()
 feederApi = Blueprint('feeder', __name__)
 
-# load .env
-load_dotenv()
-
-# MySQL configuration from env
 db_config = {
     'user': os.getenv('DB_USER'),
     'password': os.getenv('DB_PASSWORD'),
@@ -22,201 +17,193 @@ db_config = {
 }
 
 
+# ─── Mongo “consumption” ───────────────────────────────────────────
 @feederApi.route('/consumption', methods=['GET'])
 def get_feeders_from_mongo():
-    """
-    Fetch Feeder docs from MongoDB collection `powercasting.Feeder`
-    Filters:
-      • start_date, end_date (required, ISO 8601)
-      • feeder_id       (optional)
-    """
-    # 1️⃣ Time-range params (required)
     start_str = request.args.get('start_date')
     end_str = request.args.get('end_date')
     if not start_str or not end_str:
-        return jsonify({
-            "error": "start_date and end_date query parameters are required (ISO format)."
-        }), 400
+        return jsonify({"error": "start_date and end_date are required"}), 400
 
-    # 2️⃣ Parse into datetime
     try:
         start = datetime.fromisoformat(start_str.rstrip('Z'))
         end = datetime.fromisoformat(end_str.rstrip('Z'))
     except ValueError:
-        return jsonify({
-            "error": "Invalid date format. Use ISO 8601, e.g. 2023-04-01T00:00:00"
-        }), 400
+        return jsonify({"error": "Use ISO8601, e.g. 2023-04-01T00:00:00"}), 400
 
-    # 3️⃣ Optional feeder_id param
     feeder_id = request.args.get('feeder_id')
 
     try:
-        # 4️⃣ Connect to Mongo using your MONGO_URI env var
-        client = MongoClient(os.getenv("MONGO_URI"))
+        client = MongoClient(os.getenv('MONGO_URI'))
         coll = client["powercasting"]["Feeder"]
-
-        # 5️⃣ Build query
-        query = {
-            "Timestamp": {"$gte": start, "$lte": end}
-        }
+        query = {"Timestamp": {"$gte": start, "$lte": end}}
         if feeder_id:
-            query["FEEDER_id"] = feeder_id
+            query["feeder_id"] = feeder_id
 
-        # 6️⃣ Fetch & convert
-        cursor = coll.find(query, {"_id": False})
-        results = []
-        for doc in cursor:
-            # Decimal128 → float
+        docs = []
+        for doc in coll.find(query, {"_id": False}):
             for k, v in list(doc.items()):
                 if isinstance(v, Decimal128):
                     doc[k] = float(v.to_decimal())
-            # datetime → ISO string
-            ts = doc.get("Timestamp")
-            if isinstance(ts, datetime):
-                doc["Timestamp"] = ts.isoformat()
-            results.append(doc)
+            if isinstance(doc.get("Timestamp"), datetime):
+                doc["Timestamp"] = doc["Timestamp"].isoformat()
+            docs.append(doc)
 
         client.close()
-        return jsonify(results), 200
+        return jsonify(docs), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-@feederApi.route('/all', methods=['GET'])
-def get_all_feeder_data():
+# ─── READ ALL ───────────────────────────────────────────────────────
+@feederApi.route('/', methods=['GET'])
+def get_all_feeders():
     try:
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor(dictionary=True)
-
         cursor.execute("SELECT * FROM feeder")
-        feeder_data = cursor.fetchall()
-
+        rows = cursor.fetchall()
         cursor.close()
         conn.close()
-
-        return jsonify(feeder_data), 200
+        return jsonify(rows), 200
     except mysql.connector.Error as err:
         return jsonify({"error": str(err)}), 500
 
 
-@feederApi.route('/<int:id>', methods=['GET'])
-def get_feeder_by_id(id):
+# ─── READ ONE ───────────────────────────────────────────────────────
+@feederApi.route('/<string:feeder_id>', methods=['GET'])
+def get_feeder(feeder_id):
     try:
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor(dictionary=True)
-
-        cursor.execute("SELECT * FROM feeder_power_theft WHERE id = %s", (id,))
-        feeder_data = cursor.fetchone()
-
+        cursor.execute("SELECT * FROM feeder WHERE feeder_id = %s", (feeder_id,))
+        row = cursor.fetchone()
         cursor.close()
         conn.close()
-
-        if feeder_data:
-            return jsonify(feeder_data), 200
-        return jsonify({"error": "Feeder record not found"}), 404
+        if row:
+            return jsonify(row), 200
+        return jsonify({"error": "Not found"}), 404
     except mysql.connector.Error as err:
         return jsonify({"error": str(err)}), 500
 
 
+# ─── CREATE ─────────────────────────────────────────────────────────
 @feederApi.route('/', methods=['POST'])
-def create_feeder_record():
-    data = request.json
-    required_fields = ['feeder_id', 'substation_id', 'feeder_name']
-
-    if not all(field in data for field in required_fields):
-        return jsonify({"error": "Missing required fields"}), 400
+def create_feeder():
+    data = request.get_json() or {}
+    # now only these two fields are required
+    if 'substation_id' not in data or 'feeder_name' not in data:
+        return jsonify({"error": "substation_id and feeder_name are required"}), 400
 
     try:
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor(dictionary=True)
 
-        cursor.execute("""            INSERT INTO feeder
-                                          (feeder_id, substation_id, feeder_name)
-                                      VALUES (%s, %s, %s)
-                       """, (data['feeder_id'], data['substation_id'], data['feeder_name']))
+        # 1) Compute next feeder sequence:
+        cursor.execute("""
+                       SELECT MAX(
+                                      CAST(
+                                              SUBSTRING_INDEX(feeder_id, 'FEEDER', -1)
+                                          AS UNSIGNED
+                                      )
+                              ) AS max_seq
+                       FROM feeder
+                       WHERE feeder_id LIKE 'FEEDER%%'
+                       """)
+        row = cursor.fetchone()
+        max_seq = row['max_seq'] or 0
+        new_id = f"FEEDER{max_seq + 1}"
 
+        # 2) Insert with auto-generated ID
+        cursor.execute("""
+                       INSERT INTO feeder
+                           (feeder_id, substation_id, feeder_name, capacity_amperes)
+                       VALUES (%s, %s, %s, %s)
+                       """, (
+                           new_id,
+                           data['substation_id'],
+                           data['feeder_name'],
+                           data.get('capacity_amperes')
+                       ))
         conn.commit()
-        new_id = cursor.lastrowid
 
         cursor.close()
         conn.close()
 
-        return jsonify({"message": "Record created successfully", "id": new_id}), 201
+        # 3) Return the new feeder_id
+        return jsonify({
+            "message": "Feeder created",
+            "feeder_id": new_id
+        }), 201
+
     except mysql.connector.Error as err:
         return jsonify({"error": str(err)}), 500
 
 
-@feederApi.route('/<int:id>', methods=['PUT'])
-def update_feeder_record(id):
-    data = request.json
-    updateable_fields = ['date', 'feeder_name', 'units_assessed', 'amount_assessed', 'amount_realized']
-
-    if not any(field in data for field in updateable_fields):
+# ─── UPDATE ─────────────────────────────────────────────────────────
+@feederApi.route('/<string:feeder_id>', methods=['PUT'])
+def update_feeder(feeder_id):
+    data = request.get_json() or {}
+    allowed = ['substation_id', 'feeder_name', 'capacity_amperes']
+    sets, vals = [], []
+    for f in allowed:
+        if f in data:
+            sets.append(f"{f} = %s")
+            vals.append(data[f])
+    if not sets:
         return jsonify({"error": "No valid fields to update"}), 400
 
+    vals.append(feeder_id)
     try:
         conn = mysql.connector.connect(**db_config)
-        cursor = conn.cursor(dictionary=True)
-
-        # Build update query dynamically based on provided fields
-        update_fields = []
-        update_values = []
-        for field in updateable_fields:
-            if field in data:
-                update_fields.append(f"{field} = %s")
-                update_values.append(data[field])
-
-        update_values.append(id)  # Add id for WHERE clause
-        update_query = f"""
-            UPDATE feeder_power_theft 
-            SET {', '.join(update_fields)}
-            WHERE id = %s
-        """
-
-        cursor.execute(update_query, tuple(update_values))
+        cursor = conn.cursor()
+        cursor.execute(
+            f"UPDATE feeder SET {', '.join(sets)} WHERE feeder_id = %s",
+            tuple(vals)
+        )
         conn.commit()
-
-        affected_rows = cursor.rowcount
+        rc = cursor.rowcount
         cursor.close()
         conn.close()
+        if rc:
+            return jsonify({"message": "Updated"}), 200
+        return jsonify({"error": "Not found"}), 404
 
-        if affected_rows > 0:
-            return jsonify({"message": "Record updated successfully"}), 200
-        return jsonify({"error": "Record not found"}), 404
     except mysql.connector.Error as err:
         return jsonify({"error": str(err)}), 500
 
 
-@feederApi.route('/<int:id>', methods=['DELETE'])
-def delete_feeder_record(id):
+# ─── DELETE ─────────────────────────────────────────────────────────
+@feederApi.route('/<string:feeder_id>', methods=['DELETE'])
+def delete_feeder(feeder_id):
     try:
         conn = mysql.connector.connect(**db_config)
-        cursor = conn.cursor(dictionary=True)
-
-        cursor.execute("DELETE FROM feeder_power_theft WHERE id = %s", (id,))
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM feeder WHERE feeder_id = %s", (feeder_id,))
         conn.commit()
-
-        affected_rows = cursor.rowcount
+        rc = cursor.rowcount
         cursor.close()
         conn.close()
+        if rc:
+            return jsonify({"message": "Deleted"}), 200
+        return jsonify({"error": "Not found"}), 404
 
-        if affected_rows > 0:
-            return jsonify({"message": "Record deleted successfully"}), 200
-        return jsonify({"error": "Record not found"}), 404
     except mysql.connector.Error as err:
         return jsonify({"error": str(err)}), 500
 
 
-@feederApi.route('/by-substation/<substation_id>', methods=['GET'])
-def get_feeders_by_substation(substation_id):
+# ─── BY-SUBSTATION ──────────────────────────────────────────────────
+@feederApi.route('/by-substation/<string:substation_id>', methods=['GET'])
+def get_by_substation(substation_id):
     try:
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM feeder WHERE substation_id = %s", (substation_id,))
-        feeders = cursor.fetchall()
+        cursor.execute("SELECT * FROM feeder WHERE substation_id = %s",
+                       (substation_id,))
+        rows = cursor.fetchall()
         cursor.close()
         conn.close()
-        return jsonify({"status": "success", "data": feeders}), 200
+        return jsonify(rows), 200
     except mysql.connector.Error as err:
         return jsonify({"error": str(err)}), 500

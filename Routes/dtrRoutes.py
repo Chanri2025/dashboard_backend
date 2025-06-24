@@ -77,7 +77,7 @@ def get_dtr_from_mongo():
         return jsonify({"error": str(e)}), 500
 
 
-@dtrApi.route('/all', methods=['GET'])
+@dtrApi.route('/', methods=['GET'])
 def get_all_dtr_data():
     try:
         conn = mysql.connector.connect(**db_config)
@@ -124,48 +124,74 @@ def get_dtr_by_id(dtr_id):
 
 @dtrApi.route('/', methods=['POST'])
 def create_dtr_record():
-    data = request.json
-    required_fields = ['dtr_id', 'feeder_id', 'location_description', 'capacity_kva', 'residential_connections',
-                       'installed_date']
-
-    if not all(field in data for field in required_fields):
+    data = request.get_json() or {}
+    # no longer require dtr_id
+    required = ['feeder_id', 'location_description', 'capacity_kva', 'residential_connections', 'installed_date']
+    if not all(f in data for f in required):
         return jsonify({"error": "Missing required fields"}), 400
 
     try:
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor(dictionary=True)
 
-        # First check if feeder_id exists
-        cursor.execute("SELECT feeder_id FROM feeder WHERE feeder_id = %s", (data['feeder_id'],))
+        feeder_id = data['feeder_id']
+
+        # 1) Validate feeder exists
+        cursor.execute("SELECT 1 FROM feeder WHERE feeder_id = %s", (feeder_id,))
         if not cursor.fetchone():
             return jsonify({"error": "Invalid feeder_id provided"}), 400
 
+        # 2) Find current max sequence for this feeder
+        cursor.execute("""
+                       SELECT MAX(
+                                      CAST(SUBSTRING_INDEX(dtr_id, '_DTR', -1) AS UNSIGNED)
+                              ) AS max_seq
+                       FROM dtr
+                       WHERE feeder_id = %s
+                       """, (feeder_id,))
+        row = cursor.fetchone()
+        max_seq = row['max_seq'] or 0
+
+        # 3) Build next dtr_id
+        next_seq = max_seq + 1
+        new_dtr_id = f"{feeder_id}_DTR{next_seq}"
+
+        # 4) Insert the new DTR record
         cursor.execute("""
                        INSERT INTO dtr
                        (dtr_id, feeder_id, location_description, capacity_kva, residential_connections, installed_date)
                        VALUES (%s, %s, %s, %s, %s, %s)
-                       """, (data['dtr_id'], data['feeder_id'], data['location_description'],
-                             data['capacity_kva'], data['residential_connections'], data['installed_date']))
-
+                       """, (
+                           new_dtr_id,
+                           feeder_id,
+                           data['location_description'],
+                           data['capacity_kva'],
+                           data['residential_connections'],
+                           data['installed_date']
+                       ))
         conn.commit()
 
         cursor.close()
         conn.close()
 
-        return jsonify({"message": "Record created successfully", "dtr_id": data['dtr_id']}), 201
+        # 5) Return the auto-generated key
+        return jsonify({
+            "message": "Record created successfully",
+            "dtr_id": new_dtr_id
+        }), 201
+
     except mysql.connector.Error as err:
-        if err.errno == 1062:  # Duplicate entry error
-            return jsonify({"error": "DTR ID already exists"}), 400
+        # just in case of unexpected duplicates or other SQL errors
         return jsonify({"error": str(err)}), 500
 
 
 @dtrApi.route('/<string:dtr_id>', methods=['PUT'])
 def update_dtr_record(dtr_id):
     data = request.json
-    updateable_fields = ['feeder_id', 'location_description', 'capacity_kva', 'residential_connections',
-                         'installed_date']
+    updatable_fields = ['feeder_id', 'location_description', 'capacity_kva', 'residential_connections',
+                        'installed_date']
 
-    if not any(field in data for field in updateable_fields):
+    if not any(field in data for field in updatable_fields):
         return jsonify({"error": "No valid fields to update"}), 400
 
     try:
@@ -178,10 +204,10 @@ def update_dtr_record(dtr_id):
             if not cursor.fetchone():
                 return jsonify({"error": "Invalid feeder_id provided"}), 400
 
-        # Build update query dynamically based on provided fields
+        # Build an update query dynamically based on provided fields
         update_fields = []
         update_values = []
-        for field in updateable_fields:
+        for field in updatable_fields:
             if field in data:
                 update_fields.append(f"{field} = %s")
                 update_values.append(data[field])
