@@ -38,7 +38,7 @@ def get_feeders_from_mongo():
         coll = client["powercasting"]["Feeder"]
         query = {"Timestamp": {"$gte": start, "$lte": end}}
         if feeder_id:
-            query["feeder_id"] = feeder_id
+            query["FEEDER_id"] = feeder_id
 
         docs = []
         for doc in coll.find(query, {"_id": False}):

@@ -38,7 +38,7 @@ def get_substation_consumption_from_mongo():
 
         query = {"Timestamp": {"$gte": start, "$lte": end}}
         if substation_id:
-            query["substation_id"] = substation_id
+            query["SUBSTATION_id"] = substation_id
 
         docs = []
         for doc in coll.find(query, {'_id': False}):

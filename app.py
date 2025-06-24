@@ -1,5 +1,7 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from pymongo import MongoClient
+
 from Routes.demandRoutes import demandApi
 from Routes.iexRoutes import iexApi
 from Routes.procurementRoutes import procurementAPI
@@ -18,7 +20,7 @@ import mysql.connector
 import json
 from dotenv import load_dotenv
 import os
-
+from datetime import datetime
 # load .env
 load_dotenv()
 
@@ -48,86 +50,107 @@ app.register_blueprint(dtrApi, url_prefix='/dtr')  # Registering the DTR API
 app.register_blueprint(consumerApi, url_prefix='/consumer')  # Registering the Consumer API
 app.register_blueprint(powerTheftApi, url_prefix='/power-theft')  # Registering the Power Theft API
 
+# Mongo config
+MONGO_URI = os.getenv('MONGO_URI')
+MONGO_DB = 'powercasting'  # adjust if different
+MONGO_COLL = 'Demand'
 
-@app.route('/dashboard', methods=['GET'])
+
+@app.route("/dashboard", methods=["GET"])
 def get_data_with_sum():
-    start_date = request.args.get('start_date')
-    end_date = request.args.get('end_date')
+    start_date = request.args.get("start_date")
+    end_date = request.args.get("end_date")
     if not start_date or not end_date:
         return jsonify({"error": "Start date and end date parameters are required"}), 400
 
+    # parse into Python datetimes (strip trailing Z if present)
     try:
+        start = datetime.fromisoformat(start_date.rstrip("Z"))
+        end = datetime.fromisoformat(end_date.rstrip("Z"))
+    except ValueError:
+        return jsonify({"error": "Invalid date format. Use ISO 8601"}), 400
+
+    try:
+        # ── 1️⃣ Demand from MongoDB ────────────────────────────
+        mongo = MongoClient(MONGO_URI)
+        coll = mongo[MONGO_DB][MONGO_COLL]
+
+        cursor = coll.find(
+            {"TimeStamp": {"$gte": start, "$lte": end}},
+            {"_id": False}
+        )
+        demand_rows = []
+        sum_actual = 0.0
+        sum_predicted = 0.0
+
+        for doc in cursor:
+            # convert Decimal128 if needed
+            actual = doc.get("Demand(Actual)")
+            pred = doc.get("Demand(Pred)")
+
+            if hasattr(actual, "to_decimal"):
+                actual = float(actual.to_decimal())
+            if hasattr(pred, "to_decimal"):
+                pred = float(pred.to_decimal())
+
+            # accumulate
+            sum_actual += actual or 0
+            sum_predicted += pred or 0
+
+            # isoformat timestamp
+            ts = doc.get("TimeStamp")
+            if isinstance(ts, datetime):
+                doc["TimeStamp"] = ts.isoformat()
+            demand_rows.append(doc)
+
+        mongo.close()
+
+        # ── 2️⃣ IEX data from MySQL ─────────────────────────────
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor(dictionary=True)
-
-        # ── 1️⃣ Raw demand data ──────────────────────────────
         cursor.execute(
-            "SELECT * "
-            "FROM demand_data "
-            "WHERE `TimeStamp` BETWEEN %s AND %s",
-            (start_date, end_date)
-        )
-        demand_rows = cursor.fetchall()
-
-        # compute sums for demand_data (adjust field names to your schema)
-        total_actual = sum(r.get('Actual_Demand', 0) for r in demand_rows)
-        total_predicted = sum(r.get('Predicted_Demand', 0) for r in demand_rows)
-
-        # ── 2️⃣ IEX data ────────────────────────────────────
-        cursor.execute(
-            "SELECT * "
-            "FROM price "
-            "WHERE `TimeStamp` BETWEEN %s AND %s",
+            "SELECT * FROM price WHERE `TimeStamp` BETWEEN %s AND %s",
             (start_date, end_date)
         )
         iex_rows = cursor.fetchall()
+        # example sum (adjust field name)
+        sum_iex = sum(r.get("SomeIexMetric", 0) for r in iex_rows)
 
-        # example: sum some numeric field in iex_data
-        total_iex_value = sum(r.get('SomeIexMetric', 0) for r in iex_rows)
-
-        # ── 3️⃣ Procurement data ────────────────────────────
+        # ── 3️⃣ Procurement data from MySQL ────────────────────
         cursor.execute(
             "SELECT * FROM demand_output WHERE `TimeStamp` BETWEEN %s AND %s",
             (start_date, end_date)
         )
         procurement_rows = cursor.fetchall()
-
-        # for each row, parse the JSON-string columns
+        # parse JSON-string columns
         for row in procurement_rows:
-            # iex_data is a JSON-string: e.g. "{\"Qty_Pred\": 0, …}"
-            if row.get("iex_data"):
-                try:
-                    row["iex_data"] = json.loads(row["iex_data"])
-                except json.JSONDecodeError:
-                    # leave it as string if it really isn't JSON
-                    pass
-
-            # must_run is a JSON array in string form
-            if row.get("must_run"):
-                try:
-                    row["must_run"] = json.loads(row["must_run"])
-                except json.JSONDecodeError:
-                    pass
-
-            # remaining_plants likewise
-            if row.get("remaining_plants"):
-                try:
-                    row["remaining_plants"] = json.loads(row["remaining_plants"])
-                except json.JSONDecodeError:
-                    pass
+            for fld in ("iex_data", "must_run", "remaining_plants"):
+                if row.get(fld):
+                    try:
+                        row[fld] = json.loads(row[fld])
+                    except json.JSONDecodeError:
+                        pass
 
         cursor.close()
         conn.close()
 
         return jsonify({
-            "demand": demand_rows,
-            "iex": iex_rows,
-            "procurement": procurement_rows,
-        })
+            "demand": {
+                "rows": demand_rows,
+                "sum_actual": sum_actual,
+                "sum_predicted": sum_predicted
+            },
+            "iex": {
+                "rows": iex_rows,
+                "sum_metric": sum_iex
+            },
+            "procurement": procurement_rows
+        }), 200
 
     except mysql.connector.Error as err:
-        print(err)  # Add this line
         return jsonify({"error": str(err)}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/')
