@@ -477,6 +477,169 @@
 										}
 									},
 									"response": []
+								},
+								{
+									"name": "Get DTR List",
+									"id": "28164213-47c2e6f0-8738-4204-9391-b51c5ee2b304",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "noauth"
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://127.0.0.1:5000/dtr/",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "5000",
+											"path": [
+												"dtr",
+												""
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Get Single Feeder",
+									"id": "28164213-db160913-8ed4-4822-9cc1-5648ccebcbbb",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "noauth"
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://127.0.0.1:5000/dtr/FEEDER1_DTR1",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "5000",
+											"path": [
+												"dtr",
+												"FEEDER1_DTR1"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Get all DTR",
+									"id": "28164213-3486de9f-184d-4409-b85a-28d5bd57cfef",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "noauth"
+										},
+										"method": "GET",
+										"header": [],
+										"body": {
+											"mode": "formdata",
+											"formdata": []
+										},
+										"url": {
+											"raw": "http://127.0.0.1:5000/dtr/",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "5000",
+											"path": [
+												"dtr",
+												""
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "DTR Stats",
+									"id": "28164213-52b586b6-9201-44a9-99bb-709f930b5734",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "noauth"
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://127.0.0.1:5000/dtr/stats",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "5000",
+											"path": [
+												"dtr",
+												"stats"
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Create New DTR",
+									"id": "28164213-bd5f3b89-3ffe-4344-8209-5c669e8b792b",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "noauth"
+										},
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"feeder_id\": \"FEEDER3\",\n    \"location_description\": \"Durgapur\",\n    \"capacity_kva\": \"640.00\",\n    \"residential_connections\": 7,\n    \"installed_date\": \"2025-06-01\"\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "http://127.0.0.1:5000/dtr/",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "5000",
+											"path": [
+												"dtr",
+												""
+											]
+										}
+									},
+									"response": []
 								}
 							],
 							"id": "28164213-1441cde7-8b1c-4c9d-80d0-2f073387a3ff"
@@ -524,6 +687,66 @@
 													"value": "FEEDER1",
 													"type": "text"
 												}
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Get All Feeder",
+									"id": "28164213-457dc61e-b891-4a63-bcc9-065ffb771274",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "noauth"
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://127.0.0.1:5000/feeder/",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "5000",
+											"path": [
+												"feeder",
+												""
+											]
+										}
+									},
+									"response": []
+								},
+								{
+									"name": "Get Single Feeder",
+									"id": "28164213-d0c1c29c-867f-4e12-aa4a-ab21bcd6c1da",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "noauth"
+										},
+										"method": "GET",
+										"header": [],
+										"url": {
+											"raw": "http://127.0.0.1:5000/feeder/FEEDER1",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "5000",
+											"path": [
+												"feeder",
+												"FEEDER1"
 											]
 										}
 									},
