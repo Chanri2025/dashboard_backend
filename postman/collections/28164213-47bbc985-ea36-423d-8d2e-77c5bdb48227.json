@@ -548,7 +548,7 @@
 										"auth": {
 											"type": "noauth"
 										},
-										"method": "POST",
+										"method": "GET",
 										"header": [],
 										"body": {
 											"mode": "formdata",
