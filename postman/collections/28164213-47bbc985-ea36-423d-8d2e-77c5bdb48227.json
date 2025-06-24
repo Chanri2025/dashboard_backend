@@ -751,6 +751,45 @@
 										}
 									},
 									"response": []
+								},
+								{
+									"name": "Create new Feeder",
+									"id": "28164213-92f0deec-6b08-4757-bb2d-385c519975be",
+									"protocolProfileBehavior": {
+										"disableBodyPruning": true
+									},
+									"request": {
+										"auth": {
+											"type": "noauth"
+										},
+										"method": "POST",
+										"header": [],
+										"body": {
+											"mode": "raw",
+											"raw": "{\n    \"substation_id\": \"SS006\",\n    \"feeder_name\": \"South Feeder\",\n    \"capacity_amperes\": 180.75\n}",
+											"options": {
+												"raw": {
+													"language": "json"
+												}
+											}
+										},
+										"url": {
+											"raw": "http://127.0.0.1:5000/feeder/",
+											"protocol": "http",
+											"host": [
+												"127",
+												"0",
+												"0",
+												"1"
+											],
+											"port": "5000",
+											"path": [
+												"feeder",
+												""
+											]
+										}
+									},
+									"response": []
 								}
 							],
 							"id": "28164213-e973d84a-4c9e-41e4-977d-80c4964afdf7"
