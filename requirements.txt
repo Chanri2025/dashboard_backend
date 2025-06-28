@@ -35,3 +35,4 @@ zope.interface==7.0.3
 pytz~=2024.2
 python-dotenv~=1.1.0
 pymongo~=4.12.0
+python-dateutil~=2.9.0.post0

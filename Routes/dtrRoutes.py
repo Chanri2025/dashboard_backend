@@ -54,7 +54,7 @@ def get_dtr_from_mongo():
             "Timestamp": {"$gte": start, "$lte": end}
         }
         if dtr_id:
-            query["DTR_id"] = dtr_id
+            query["DTR_ID"] = dtr_id
 
         # 6️⃣ Fetch & convert
         cursor = coll.find(query, {"_id": False})

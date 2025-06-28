@@ -1,5 +1,7 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from pymongo import MongoClient
+
 from Routes.demandRoutes import demandApi
 from Routes.iexRoutes import iexApi
 from Routes.procurementRoutes import procurementAPI
@@ -18,6 +20,7 @@ import mysql.connector
 import json
 from dotenv import load_dotenv
 import os
+from datetime import datetime
 
 # load .env
 load_dotenv()
@@ -47,6 +50,11 @@ app.register_blueprint(feederApi, url_prefix='/feeder')  # Registering the Feede
 app.register_blueprint(dtrApi, url_prefix='/dtr')  # Registering the DTR API
 app.register_blueprint(consumerApi, url_prefix='/consumer')  # Registering the Consumer API
 app.register_blueprint(powerTheftApi, url_prefix='/power-theft')  # Registering the Power Theft API
+
+# Mongo config
+MONGO_URI = os.getenv('MONGO_URI')
+MONGO_DB = 'powercasting'  # adjust if different
+MONGO_COLL = 'Demand'
 
 
 @app.route('/dashboard', methods=['GET'])
