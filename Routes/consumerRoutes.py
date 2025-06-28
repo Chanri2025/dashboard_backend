@@ -1,11 +1,11 @@
-from flask import Blueprint, jsonify, request
-import mysql.connector
 import os
-from dotenv import load_dotenv
-from pymongo import MongoClient
-from bson.decimal128 import Decimal128
 from datetime import datetime
-import json
+import mysql.connector
+from bson.decimal128 import Decimal128
+from dotenv import load_dotenv
+from flask import Blueprint, jsonify, request
+from pymongo import MongoClient
+from dateutil import parser
 
 consumerApi = Blueprint('consumer', __name__)
 load_dotenv()
@@ -21,10 +21,10 @@ db_config = {
 @consumerApi.route('/consumption', methods=['GET'])
 def get_lt_consumption_from_mongo():
     """
-    Fetch LT consumption from MongoDB collection `powercasting.LT_Consumption`.
+    Fetch LT consumption from MongoDB collection `powercasting.Consumer_Consumption`.
     Filters:
-      • start_date, end_date (required, ISO 8601)
-      • consumer_id      (optional)
+      • start_date, end_date (required, ISO 8601 or "YYYY-MM-DD HH:mm")
+      • consumer_id          (optional)
     """
     # 1️⃣ Required time params
     start_str = request.args.get('start_date')
@@ -34,11 +34,11 @@ def get_lt_consumption_from_mongo():
             "error": "Both start_date and end_date query parameters are required (ISO format)."
         }), 400
 
-    # 2️⃣ Parse to datetime
+    # 2️⃣ Parse datetime with fallback using dateutil.parser
     try:
-        start = datetime.fromisoformat(start_str.rstrip('Z'))
-        end = datetime.fromisoformat(end_str.rstrip('Z'))
-    except ValueError:
+        start = parser.parse(start_str)
+        end = parser.parse(end_str)
+    except (ValueError, TypeError):
         return jsonify({
             "error": "Invalid date format. Use ISO 8601, e.g. 2023-04-01T00:00:00"
         }), 400
@@ -47,9 +47,9 @@ def get_lt_consumption_from_mongo():
     consumer_id = request.args.get('consumer_id')
 
     try:
-        # 4️⃣ Connect to Mongo
+        # 4️⃣ Connect to MongoDB
         client = MongoClient(os.getenv("MONGO_URI"))
-        coll = client["powercasting"]["LT_Consumption"]
+        coll = client["powercasting"]["Consumer_Consumption"]
 
         # 5️⃣ Build query
         query = {
@@ -58,18 +58,17 @@ def get_lt_consumption_from_mongo():
         if consumer_id:
             query["Consumer_id"] = consumer_id
 
-        # 6️⃣ Retrieve & convert
+        # 6️⃣ Retrieve documents
         cursor = coll.find(query, {"_id": False})
         results = []
         for doc in cursor:
-            # Decimal128 → float
+            # Convert Decimal128 fields to float
             for k, v in list(doc.items()):
                 if isinstance(v, Decimal128):
                     doc[k] = float(v.to_decimal())
-            # datetime → ISO string
-            ts = doc.get("Timestamp")
-            if isinstance(ts, datetime):
-                doc["Timestamp"] = ts.isoformat()
+            # Convert Timestamp to ISO string
+            if isinstance(doc.get("Timestamp"), datetime):
+                doc["Timestamp"] = doc["Timestamp"].isoformat()
             results.append(doc)
 
         client.close()
