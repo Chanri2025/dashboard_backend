@@ -1,8 +1,10 @@
+from datetime import datetime
 from flask import Blueprint, jsonify, request
 import mysql.connector
 import json
 from dotenv import load_dotenv
 import os
+from pymongo import MongoClient
 
 # Create a Blueprint
 plantAPI = Blueprint('plant', __name__)
@@ -17,6 +19,11 @@ db_config = {
     'host': os.getenv('DB_HOST'),
     'database': os.getenv('DB_NAMES').split(',')[1],  # Using guvnl_consumers for plant routes
 }
+
+# MongoDB setup
+client = MongoClient("mongodb://localhost:27017")  # Update with your Mongo URI
+db = client["powercasting"]
+collection = db["mustrunplantconsumption"]
 
 
 @plantAPI.route('/demand-output', methods=['GET'])
@@ -153,43 +160,31 @@ def get_plant_data():
 
 @plantAPI.route('/<plant_name>', methods=['GET'])
 def get_each_plant_data(plant_name):
-    # 1️⃣ grab start/end from query-string
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
+
     if not start_date or not end_date:
         return jsonify({
-            "error": "start_date and end_date parameters are required, e.g. ?start_date=2025-05-01T00:00:00&end_date=2025-05-02T00:00:00"
+            "error": "start_date and end_date parameters are required, e.g. ?start_date=2021-01-04T00:00:00&end_date=2021-01-04T01:00:00"
         }), 400
 
     try:
-        conn = mysql.connector.connect(**db_config)
-        cursor = conn.cursor(dictionary=True)
+        # Convert to datetime objects
+        start_dt = datetime.fromisoformat(start_date)
+        end_dt = datetime.fromisoformat(end_date)
 
-        # 2️⃣ filter rows in the given plant table by TimeStamp
-        query = f"""
-            SELECT *
-            FROM `{plant_name}`
-            WHERE `TimeStamp` BETWEEN %s AND %s
-        """
-        cursor.execute(query, (start_date, end_date))
-        rows = cursor.fetchall()
+        # Query MongoDB
+        query = {
+            "TimeStamp": {"$gte": start_dt, "$lte": end_dt},
+            "Plant_Name": plant_name
+        }
 
-        return jsonify(rows), 200
+        data = list(collection.find(query, {"_id": 0}))  # exclude _id if not needed
 
-    except mysql.connector.Error as err:
-        # returns the MySQL error message for easier debugging
-        return jsonify({"error": str(err)}), 500
+        return jsonify(data), 200
 
     except Exception as e:
-        return jsonify({"error": "Internal server error"}), 500
-
-    finally:
-        # 3️⃣ always clean up
-        try:
-            cursor.close()
-            conn.close()
-        except:
-            pass
+        return jsonify({"error": str(e)}), 500
 
 
 @plantAPI.route('/', methods=['POST'])
