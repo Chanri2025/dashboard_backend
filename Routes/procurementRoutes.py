@@ -117,6 +117,7 @@ def allocate_generation(
         backdown_cost = round(backdown_rate * (max_gen - gen), 2)
         base['backdown_rate'] = backdown_rate
         base['backdown_cost'] = backdown_cost
+        base['backdown_unit'] = backdown_cost / backdown_rate if backdown_cost else 0.0
         final_list.append(base)
         total_cost += base['net_cost']
     final_list.sort(key=lambda x: x['Variable_Cost'])
@@ -277,10 +278,13 @@ def get_demand():
         # convert to kWh
         actual_kwh = round(float(demand_row['Demand(Actual)']) * 1000 * 0.25, 3)
         pred_kwh = round(float(demand_row['Demand(Pred)']) * 1000 * 0.25, 3)
-        pred_banked = pred_kwh + banking_unit
+
+        # select which demand to bank: only use pred_kwh if we actually have a non-zero actual_kwh
+        base_kwh = pred_kwh if actual_kwh == 0 else actual_kwh
+        banked_kwh = base_kwh + banking_unit
 
         # must-run
-        must = get_must_run(pred_banked, demand_row['TimeStamp'])
+        must = get_must_run(banked_kwh, demand_row['TimeStamp'])
         if 'error' in must:
             return jsonify({'error': must['error']}), 500
 
@@ -293,7 +297,7 @@ def get_demand():
         iex_gen = iex['Qty_Pred'] if iex['Pred_Price'] else 0.0
 
         # remaining
-        net1 = pred_banked - must['generated_energy_all']
+        net1 = banked_kwh - must['generated_energy_all']
         net2 = net1 - iex_gen
         other = get_other_run(net2, start_date)
         if 'error' in other:
@@ -315,14 +319,21 @@ def get_demand():
         # ────────────────────────────────────────────────────────────
         iex_price = iex['Pred_Price'] if iex['Qty_Pred'] > 0 else 0.0
         last_price = max(round(rem_plants[-1]['Variable_Cost'], 2), iex_price)
-        cost_per_block = round((must['total_cost'] + iex_cost + rem_cost) / pred_banked, 2) if pred_banked else 0.0
+        cost_per_block = round((must['total_cost'] + iex_cost + rem_cost) / banked_kwh, 2) if banked_kwh else 0.0
+        backdown_unit=sum([p['backdown_unit'] for p in rem_plants])
+        # min_backdown_cost will be minimum of backdown_cost for plants that have a backdown_unit > 0
+        min_backdown_cost = min(
+            (p['backdown_rate'] for p in rem_plants if p['backdown_unit'] > 0),
+            default=0.0
+        )
 
         result = OrderedDict({
             'TimeStamp': demand_row['TimeStamp'],
             'Demand(Actual)': actual_kwh,
             'Demand(Pred)': pred_kwh,
             'Banking_Unit': banking_unit,
-            'Demand_Banked': pred_banked,
+            'Demand_Banked': banked_kwh,
+            'Backdown_Cost_Min': round(min_backdown_cost, 2),
             'Must_Run': must['plant_data'],
             'Must_Run_Total_Gen': must['generated_energy_all'],
             'Must_Run_Total_Cost': must['total_cost'],
@@ -335,6 +346,7 @@ def get_demand():
             'Last_Price': round(last_price, 2),
             'Cost_Per_Block': round(cost_per_block, 2),
             'Backdown_Cost': round(total_backdown, 2),
+            'Backdown_Unit': round(backdown_unit, 2)
         })
 
         cursor.close()
