@@ -6,6 +6,8 @@ from collections import OrderedDict
 from dotenv import load_dotenv
 import os
 
+from pymongo import MongoClient
+
 # ----------------------------- Blueprint Setup -----------------------------
 procurementAPI = Blueprint('procurement', __name__)
 
@@ -19,6 +21,40 @@ db_config = {
     'host': os.getenv('DB_HOST'),
     'database': os.getenv('DB_NAMES').split(',')[1],  # Using guvnl_dev for procurement routes
 }
+
+# ——— MongoDB setup ———
+# MONGO_URI might look like "mongodb://username:password@host:port/"
+mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
+client = MongoClient(mongo_uri)
+
+# select your database and collection
+db = client["powercasting"]
+collection = db["Demand_Output"]
+
+
+def parse_timestamp(ts_str: str) -> datetime:
+    """
+    Accept either:
+      - ISO format: '2023-04-01 00:00:00'
+      - RFC-style:  'Sat, 01 Apr 2023 00:00:00 GMT' (or without the ' GMT')
+    """
+    ts = ts_str.strip()
+    # 1) Try ISO "YYYY-MM-DD HH:MM:SS"
+    try:
+        return datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        pass
+
+    # 2) Try the RFC-style with day-of-week + month name
+    #    remove a trailing " GMT" if present
+    ts_clean = ts.replace(" GMT", "")
+    try:
+        return datetime.strptime(ts_clean, "%a, %d %b %Y %H:%M:%S")
+    except ValueError:
+        pass
+
+    # 3) Nothing matched
+    raise ValueError(f"time data {ts_str!r} does not match any supported format")
 
 
 # ----------------------------- Helper Functions -----------------------------
@@ -281,7 +317,7 @@ def get_demand():
 
         # select which demand to bank: only use pred_kwh if we actually have a non-zero actual_kwh
         base_kwh = pred_kwh if actual_kwh == 0 else actual_kwh
-        banked_kwh = base_kwh + banking_unit
+        banked_kwh = base_kwh - banking_unit
 
         # must-run
         must = get_must_run(banked_kwh, demand_row['TimeStamp'])
@@ -320,7 +356,7 @@ def get_demand():
         iex_price = iex['Pred_Price'] if iex['Qty_Pred'] > 0 else 0.0
         last_price = max(round(rem_plants[-1]['Variable_Cost'], 2), iex_price)
         cost_per_block = round((must['total_cost'] + iex_cost + rem_cost) / banked_kwh, 2) if banked_kwh else 0.0
-        backdown_unit=sum([p['backdown_unit'] for p in rem_plants])
+        backdown_unit = sum([p['backdown_unit'] for p in rem_plants])
         # min_backdown_cost will be minimum of backdown_cost for plants that have a backdown_unit > 0
         min_backdown_cost = min(
             (p['backdown_rate'] for p in rem_plants if p['backdown_unit'] > 0),
@@ -333,7 +369,7 @@ def get_demand():
             'Demand(Pred)': pred_kwh,
             'Banking_Unit': banking_unit,
             'Demand_Banked': banked_kwh,
-            'Backdown_Cost_Min': round(min_backdown_cost, 2),
+            'Backdown_Cost_Min': round(min_backdown_cost, 2) if banking_unit > 0 else 0.0,
             'Must_Run': must['plant_data'],
             'Must_Run_Total_Gen': must['generated_energy_all'],
             'Must_Run_Total_Cost': must['total_cost'],
@@ -345,8 +381,8 @@ def get_demand():
             'Remaining_Plants_Total_Cost': round(rem_cost, 2),
             'Last_Price': round(last_price, 2),
             'Cost_Per_Block': round(cost_per_block, 2),
-            'Backdown_Cost': round(total_backdown, 2),
-            'Backdown_Unit': round(backdown_unit, 2)
+            'Backdown_Cost': round(total_backdown, 2) if banking_unit > 0 else 0.0,
+            'Backdown_Unit': round(backdown_unit, 2) if banking_unit > 0 else 0.0
         })
 
         cursor.close()
@@ -363,47 +399,65 @@ def get_demand():
 
 
 @procurementAPI.route('/range', methods=['GET'])
-def get_demand_range():
-    start = request.args.get('start')  # e.g. "2021-04-01 00:00:00"
-    end = request.args.get('end')  # e.g. "2021-04-02 00:00:00"
-
+def get_demand_output_range():
+    """
+    GET /range?start=<ts>&end=<ts>
+    Returns all Demand_Output docs between start and end (inclusive),
+    along with summary (total/average cost_per_block and last_price).
+    Expects timestamps in the same format your POST accepts:
+    'Sat, 01 Apr 2023 00:00:00 GMT'
+    """
+    start = request.args.get('start')
+    end = request.args.get('end')
     if not start or not end:
         return jsonify({"error": "Both 'start' and 'end' query parameters are required"}), 400
 
+    # parse them into datetimes
     try:
-        conn = mysql.connector.connect(**db_config)
-        cursor = conn.cursor(dictionary=True)
+        start_dt = parse_timestamp(start)
+        end_dt = parse_timestamp(end)
+    except ValueError as e:
+        return jsonify({"error": f"Invalid timestamp format: {e}"}), 400
 
-        # fetch raw rows (fixed: removed extra comma)
-        cursor.execute("""
-                       SELECT timestamp, cost_per_block, last_price
-                       FROM demand_output
-                       WHERE timestamp BETWEEN %s
-                         AND %s
-                       ORDER BY TimeStamp
-                       """, (start, end))
-        rows = cursor.fetchall()
+    # fetch matching docs
+    cursor = collection.find(
+        {"TimeStamp": {"$gte": start_dt, "$lte": end_dt}},
+        {"_id": 0}
+    ).sort("TimeStamp", 1)
+    docs = list(cursor)
 
-        # calculate total and average
-        total_cost_per_block = sum(r['cost_per_block'] for r in rows)
-        average_cost_per_block = total_cost_per_block / len(rows) if rows else None
-
-        total_mod = sum(r['last_price'] for r in rows)
-        average_mod = total_mod / len(rows) if rows else None
-
-        cursor.close()
-        conn.close()
-
-        return jsonify({
-            "data": rows,
-            "summary": {
-                "total_cost_per_block": total_cost_per_block,
-                "average_cost_per_block": round(average_cost_per_block, 2),
-                "total_mod": total_mod,
-                "average_mod": round(average_mod, 2)
-
-            }
+    # build the rows in the same shape as your old MySQL output
+    rows = []
+    for doc in docs:
+        # convert back to the string form for clients
+        ts_str = doc["TimeStamp"].strftime("%a, %d %b %Y %H:%M:%S GMT")
+        rows.append({
+            "timestamp": ts_str,
+            "cost_per_block": doc.get("Cost_Per_Block", 0),
+            "last_price": doc.get("Last_Price", 0)
         })
 
-    except mysql.connector.Error as err:
-        return jsonify({"error": str(err)}), 500
+    # compute totals & averages
+    total_cost_per_block = sum(r["cost_per_block"] for r in rows)
+    average_cost_per_block = (
+        total_cost_per_block / len(rows)
+        if rows else None
+    )
+
+    total_mod = sum(r["last_price"] for r in rows)
+    average_mod = (
+        total_mod / len(rows)
+        if rows else None
+    )
+
+    return jsonify({
+        "data": rows,
+        "summary": {
+            "total_cost_per_block": total_cost_per_block,
+            "average_cost_per_block": round(average_cost_per_block, 2)
+            if average_cost_per_block is not None else None,
+            "total_mod": total_mod,
+            "average_mod": round(average_mod, 2)
+            if average_mod is not None else None
+        }
+    }), 200
