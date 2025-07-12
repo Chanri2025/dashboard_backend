@@ -1,7 +1,7 @@
+from bson.decimal128 import Decimal128
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from pymongo import MongoClient
-
 from Routes.demandRoutes import demandApi
 from Routes.iexRoutes import iexApi
 from Routes.procurementRoutes import procurementAPI
@@ -51,10 +51,34 @@ app.register_blueprint(dtrApi, url_prefix='/dtr')  # Registering the DTR API
 app.register_blueprint(consumerApi, url_prefix='/consumer')  # Registering the Consumer API
 app.register_blueprint(powerTheftApi, url_prefix='/power-theft')  # Registering the Power Theft API
 
-# Mongo config
+# ——— Mongo config ———
 MONGO_URI = os.getenv('MONGO_URI')
-MONGO_DB = 'powercasting'  # adjust if different
-MONGO_COLL = 'Demand'
+MONGO_DB = 'powercasting'
+
+client = MongoClient(MONGO_URI)
+db = client[MONGO_DB]
+demand_coll = db['Demand']
+iex_coll = db['IEX_Price']
+procurement_coll = db['Demand_Output']
+
+
+def parse_iso(ts_str: str) -> datetime:
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+        try:
+            return datetime.strptime(ts_str, fmt)
+        except ValueError:
+            continue
+    raise ValueError(f"time data {ts_str!r} does not match any supported format")
+
+
+def convert_decimal128(obj):
+    if isinstance(obj, Decimal128):
+        return float(obj.to_decimal())
+    if isinstance(obj, dict):
+        return {k: convert_decimal128(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [convert_decimal128(v) for v in obj]
+    return obj
 
 
 @app.route('/dashboard', methods=['GET'])
@@ -65,77 +89,86 @@ def get_data_with_sum():
         return jsonify({"error": "Start date and end date parameters are required"}), 400
 
     try:
-        conn = mysql.connector.connect(**db_config)
-        cursor = conn.cursor(dictionary=True)
+        start_dt = parse_iso(start_date)
+        end_dt = parse_iso(end_date)
+    except ValueError as e:
+        return jsonify({"error": f"Invalid date format: {e}"}), 400
 
-        # ── 1️⃣ Raw demand data ──────────────────────────────
-        cursor.execute(
-            "SELECT * "
-            "FROM demand_data "
-            "WHERE `TimeStamp` BETWEEN %s AND %s",
-            (start_date, end_date)
-        )
-        demand_rows = cursor.fetchall()
+    # ── Demand ─────────────────────────────────────────────────────
+    demand_rows = []
+    for raw in demand_coll.find(
+            {"TimeStamp": {"$gte": start_dt, "$lte": end_dt}},
+            {"_id": 0}
+    ):
+        doc = convert_decimal128(raw)
+        ts = doc.get("TimeStamp")
+        if isinstance(ts, datetime):
+            doc["TimeStamp"] = ts.strftime("%a, %d %b %Y %H:%M:%S GMT")
+        demand_rows.append(doc)
 
-        # compute sums for demand_data (adjust field names to your schema)
-        total_actual = sum(r.get('Actual_Demand', 0) for r in demand_rows)
-        total_predicted = sum(r.get('Predicted_Demand', 0) for r in demand_rows)
+    # ── IEX ────────────────────────────────────────────────────────
+    iex_rows = []
+    for raw in iex_coll.find(
+            {"TimeStamp": {"$gte": start_dt, "$lte": end_dt}},
+            {"_id": 0}
+    ):
+        doc = convert_decimal128(raw)
+        ts = doc.get("TimeStamp")
+        if isinstance(ts, datetime):
+            doc["TimeStamp"] = ts.strftime("%a, %d %b %Y %H:%M:%S GMT")
+        iex_rows.append(doc)
 
-        # ── 2️⃣ IEX data ────────────────────────────────────
-        cursor.execute(
-            "SELECT * "
-            "FROM price "
-            "WHERE `TimeStamp` BETWEEN %s AND %s",
-            (start_date, end_date)
-        )
-        iex_rows = cursor.fetchall()
+    # ── Procurement ───────────────────────────────────────────────
+    procurement_rows = []
+    for raw in procurement_coll.find(
+            {"TimeStamp": {"$gte": start_dt, "$lte": end_dt}},
+            {"_id": 0}
+    ):
+        doc = convert_decimal128(raw)
 
-        # example: sum some numeric field in iex_data
-        total_iex_value = sum(r.get('SomeIexMetric', 0) for r in iex_rows)
+        # format the main timestamp
+        ts_orig = doc.get("TimeStamp")
+        if isinstance(ts_orig, datetime):
+            ts_str = ts_orig.strftime("%a, %d %b %Y %H:%M:%S GMT")
+        else:
+            ts_str = ts_orig  # assume it's already a string
 
-        # ── 3️⃣ Procurement data ────────────────────────────
-        cursor.execute(
-            "SELECT * FROM demand_output WHERE `TimeStamp` BETWEEN %s AND %s",
-            (start_date, end_date)
-        )
-        procurement_rows = cursor.fetchall()
+        # remap into snake_case
+        rec = {
+            "backdown_total_cost": doc.get("Backdown_Cost", 0),
+            "backdown_cost_min": doc.get("Backdown_Cost_Min", 0),
+            "backdown_unit": doc.get("Backdown_Unit", 0),
+            "banking_unit": doc.get("Banking_Unit", 0),
+            "cost_per_block": doc.get("Cost_Per_Block", 0),
+            "demand_actual": doc.get("Demand(Actual)", 0),
+            "demand_banked": doc.get("Demand_Banked", 0),
+            "demand_pred": doc.get("Demand(Pred)", 0),
+            "iex_cost": doc.get("IEX_Cost", 0),
+            "iex_data": doc.get("IEX_Data", {}),
+            "iex_gen": doc.get("IEX_Gen", 0),
+            "last_price": doc.get("Last_Price", 0),
+            "must_run": doc.get("Must_Run", []),
+            "must_run_total_cost": doc.get("Must_Run_Total_Cost", 0),
+            "must_run_total_gen": doc.get("Must_Run_Total_Gen", 0),
+            "remaining_plants": doc.get("Remaining_Plants", []),
+            "remaining_plants_total_cost": doc.get("Remaining_Plants_Total_Cost", 0),
+            "remaining_plants_total_gen": doc.get("Remaining_Plants_Total_Gen", 0),
+            "timestamp": ts_str,
+        }
 
-        # for each row, parse the JSON-string columns
-        for row in procurement_rows:
-            # iex_data is a JSON-string: e.g. "{\"Qty_Pred\": 0, …}"
-            if row.get("iex_data"):
-                try:
-                    row["iex_data"] = json.loads(row["iex_data"])
-                except json.JSONDecodeError:
-                    # leave it as string if it really isn't JSON
-                    pass
+        # format nested IEX_Data.TimeStamp if present
+        nested = rec["iex_data"]
+        nts = nested.get("TimeStamp")
+        if isinstance(nts, datetime):
+            nested["TimeStamp"] = nts.strftime("%a, %d %b %Y %H:%M:%S GMT")
 
-            # must_run is a JSON array in string form
-            if row.get("must_run"):
-                try:
-                    row["must_run"] = json.loads(row["must_run"])
-                except json.JSONDecodeError:
-                    pass
+        procurement_rows.append(rec)
 
-            # remaining_plants likewise
-            if row.get("remaining_plants"):
-                try:
-                    row["remaining_plants"] = json.loads(row["remaining_plants"])
-                except json.JSONDecodeError:
-                    pass
-
-        cursor.close()
-        conn.close()
-
-        return jsonify({
-            "demand": demand_rows,
-            "iex": iex_rows,
-            "procurement": procurement_rows,
-        })
-
-    except mysql.connector.Error as err:
-        print(err)  # Add this line
-        return jsonify({"error": str(err)}), 500
+    return jsonify({
+        "demand": demand_rows,
+        "iex": iex_rows,
+        "procurement": procurement_rows
+    }), 200
 
 
 @app.route('/')
