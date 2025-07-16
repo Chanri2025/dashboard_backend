@@ -25,42 +25,6 @@ client = MongoClient("mongodb://localhost:27017")  # Update with your Mongo URI
 db = client["powercasting"]
 collection = db["mustrunplantconsumption"]
 
-
-@plantAPI.route('/demand-output', methods=['GET'])
-def get_demand_data():
-    start_date = request.args.get('start_date')
-    end_date = request.args.get('end_date')
-    if not start_date or not end_date:
-        return jsonify({"error": "Start date and end date parameters are required"}), 400
-
-    try:
-        conn = mysql.connector.connect(**db_config)
-        cursor = conn.cursor(dictionary=True)
-
-        # Fetch the sum of Demand(Pred) within the date range
-        sum_query = "SELECT * FROM demand_output WHERE `TimeStamp` BETWEEN %s AND %s"
-        cursor.execute(sum_query, (start_date, end_date))
-        sum_result = cursor.fetchall()
-
-        # Decode JSON fields
-        for row in sum_result:
-            for key in ['IEX_Data', 'Must_Run', 'Remaining_Plants']:  # Adjust based on your field names
-                if key in row and row[key]:
-                    try:
-                        row[key] = json.loads(row[key])  # Convert JSON string to dictionary
-                    except json.JSONDecodeError:
-                        row[key] = f"Invalid JSON: {row[key]}"  # Handle JSON decode errors gracefully
-
-        cursor.close()
-        conn.close()
-
-        return jsonify(sum_result), 200
-    except mysql.connector.Error as err:
-        return jsonify({"error": str(err)}), 500
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
 @plantAPI.route('/all', methods=['GET'])
 def get_all_plant_data():
     try:
