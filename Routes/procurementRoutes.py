@@ -333,17 +333,16 @@ def get_demand():
             "Demand(Pred)": demand_data.get("Demand(Pred)", 0)
         }
 
-        # Fetch banking data (still from MySQL)
-        conn = mysql.connector.connect(**db_config)
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute(
-            "SELECT Banking_Unit FROM Banking_Data WHERE `TimeStamp` BETWEEN %s AND %s",
-            (start_date, start_date)
-        )
-        bank_row = cursor.fetchone() or {'Banking_Unit': 0}
+        # Fetch banking data from MongoDB
+        banking_collection = db["Banking_Data"]
+        bank_data = banking_collection.find_one({"TimeStamp": start_date_dt})
+
+        # Format similar to MySQL result
+        bank_row = {'Banking_Unit': 0}
+        if bank_data and "Banking_Unit" in bank_data:
+            bank_row = {'Banking_Unit': bank_data["Banking_Unit"]}
+
         banking_unit = bank_row.get('Banking_Unit', 0) or 0
-        cursor.close()
-        conn.close()
 
         # convert to kWh
         actual_kwh = round(float(demand_row['Demand(Actual)']) * 1000 * 0.25, 3)
@@ -421,13 +420,8 @@ def get_demand():
 
         return jsonify(result), 200
 
-    except mysql.connector.Error as err:
-        return jsonify({'error': str(err)}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    finally:
-        if 'cursor' in locals(): cursor.close()
-        if 'conn' in locals() and conn.is_connected(): conn.close()
 
 
 @procurementAPI.route('/range', methods=['GET'])
