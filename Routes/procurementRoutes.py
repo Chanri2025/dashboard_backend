@@ -24,7 +24,7 @@ db_config = {
 
 # ——— MongoDB setup ———
 # MONGO_URI might look like "mongodb://username:password@host:port/"
-mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
+mongo_uri = os.getenv("MONGO_URI")
 client = MongoClient(mongo_uri)
 
 # select your database and collection
@@ -164,6 +164,9 @@ def get_must_run(net_demand: float, timestamp: str) -> Dict[str, Any]:
     if not net_demand:
         return {"error": "Net demand parameters are required"}
     try:
+        # Convert timestamp string to datetime for MongoDB query
+        timestamp_dt = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor(dictionary=True)
         # Fetch must-run plant details
@@ -186,24 +189,35 @@ def get_must_run(net_demand: float, timestamp: str) -> Dict[str, Any]:
             """
         )
         plants = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        # Get the MongoDB collection for must-run plant consumption
+        mustrun_collection = db["mustrunplantconsumption"]
+
         gen_all = 0.0
         cost_all = 0.0
         data = []
+
         for plant in plants:
             code = plant['Code']
-            # Use LIMIT 1 to avoid unread-result errors
-            try:
-                cursor.execute(
-                    f"SELECT Pred FROM `{code}` WHERE TimeStamp = %s LIMIT 1",
-                    (timestamp,)
-                )
-                pred_row = cursor.fetchone() or {'Pred': 0.0}
-            except mysql.connector.Error:
-                pred_row = {'Pred': 0.0}
-            gen_kwh = round(float(pred_row['Pred']) * 1000 * 0.25, 3)
+
+            # Query MongoDB for the plant's prediction data
+            pred_data = mustrun_collection.find_one({
+                "TimeStamp": timestamp_dt,
+                "Plant_Name": code
+            })
+
+            # Default to 0 if no data found
+            pred_value = 0.0
+            if pred_data and "Pred" in pred_data:
+                pred_value = float(pred_data["Pred"])
+
+            gen_kwh = round(pred_value * 1000 * 0.25, 3)
             gen_all += gen_kwh
             var_cost = float(plant['Variable_Cost'])
             cost_all += round(gen_kwh * var_cost, 2)
+
             data.append({
                 'plant_name': plant['name'],
                 'plant_code': code,
@@ -218,8 +232,7 @@ def get_must_run(net_demand: float, timestamp: str) -> Dict[str, Any]:
                 'min_power': plant['Min_Power'],
                 'net_cost': round(gen_kwh * var_cost, 2)
             })
-        cursor.close()
-        conn.close()
+
         return {'plant_data': data, 'generated_energy_all': gen_all, 'total_cost': cost_all}
     except Exception as e:
         return {'error': str(e)}
@@ -227,23 +240,37 @@ def get_must_run(net_demand: float, timestamp: str) -> Dict[str, Any]:
 
 def get_exchange_data(timestamp: str, cap_price: float) -> Union[List[Dict[str, Any]], Dict[str, str]]:
     try:
-        conn = mysql.connector.connect(**db_config)
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute(
-            "SELECT `TimeStamp`, `Pred_Price`, `Qty_Pred` FROM iex_data WHERE TimeStamp = %s",
-            (timestamp,)
-        )
-        rows = cursor.fetchall()
-        for r in rows:
-            if r['Pred_Price'] > float(cap_price):
-                r['Pred_Price'] = 0.0
+        # Convert timestamp string to datetime object for MongoDB query
+        timestamp_dt = datetime.strptime(timestamp, "%Y-%m-%d %H:%M:%S")
+
+        # Query MongoDB collection
+        iex_collection = db["IEX_Generation"]
+        iex_data = iex_collection.find_one({"TimeStamp": timestamp_dt})
+
+        if not iex_data:
+            return []
+
+        # Format the data similar to the MySQL version
+        result = {
+            "TimeStamp": timestamp,
+            "Pred_Price": 0.0,
+            "Qty_Pred": 0.0
+        }
+
+        # Check if we have price and quantity data
+        if "Pred_Price" in iex_data:
+            pred_price = float(iex_data["Pred_Price"])
+            # Apply price cap
+            if pred_price > float(cap_price):
+                result["Pred_Price"] = 0.0
             else:
-                r['Qty_Pred'] = round(r['Qty_Pred'] * 1000 * 0.25, 3)
-        cursor.close()
-        conn.close()
-        return rows
-    except mysql.connector.Error as err:
-        return {'error': str(err)}
+                result["Pred_Price"] = pred_price
+
+        if "Qty_Pred" in iex_data:
+            # Convert to kWh (MW * 1000 * 0.25)
+            result["Qty_Pred"] = round(float(iex_data["Qty_Pred"]) * 1000 * 0.25, 3)
+
+        return [result]
     except Exception as e:
         return {'error': str(e)}
 
@@ -289,27 +316,34 @@ def get_demand():
     start_date = start_date[:19]
 
     try:
+        # Convert start_date string to datetime for MongoDB query
+        start_date_dt = datetime.strptime(start_date, "%Y-%m-%d %H:%M:%S")
+
+        # Fetch demand data from MongoDB
+        demand_collection = db["Demand"]
+        demand_data = demand_collection.find_one({"TimeStamp": start_date_dt})
+
+        if not demand_data:
+            return jsonify({'error': 'No demand data found for the given date'}), 404
+
+        # Create demand_row similar to MySQL version
+        demand_row = {
+            "TimeStamp": start_date,
+            "Demand(Actual)": demand_data.get("Demand(Actual)", 0),
+            "Demand(Pred)": demand_data.get("Demand(Pred)", 0)
+        }
+
+        # Fetch banking data (still from MySQL)
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor(dictionary=True)
-
-        # fetch demand
-        cursor.execute(
-            "SELECT `Demand(Actual)`, `Demand(Pred)`, `TimeStamp` "
-            "FROM demand_data WHERE `TimeStamp` BETWEEN %s AND %s",
-            (start_date, start_date)
-        )
-        demand_row = cursor.fetchone()
-
-        # fetch banking
         cursor.execute(
             "SELECT Banking_Unit FROM Banking_Data WHERE `TimeStamp` BETWEEN %s AND %s",
             (start_date, start_date)
         )
         bank_row = cursor.fetchone() or {'Banking_Unit': 0}
         banking_unit = bank_row.get('Banking_Unit', 0) or 0
-
-        if not demand_row:
-            return jsonify({'error': 'No demand data found for the given date'}), 404
+        cursor.close()
+        conn.close()
 
         # convert to kWh
         actual_kwh = round(float(demand_row['Demand(Actual)']) * 1000 * 0.25, 3)
@@ -345,7 +379,7 @@ def get_demand():
 
         # ─────────────── BANKING‐CHECK FOR BACKDOWN ───────────────
         if banking_unit == 0:
-            # zero out each plant’s backdown_cost
+            # zero out each plant's backdown_cost
             for p in rem_plants:
                 p['backdown_cost'] = 0.0
             total_backdown = 0.0
@@ -354,12 +388,12 @@ def get_demand():
             total_backdown = sum(p['backdown_cost'] for p in rem_plants)
         # ────────────────────────────────────────────────────────────
         iex_price = iex['Pred_Price'] if iex['Qty_Pred'] > 0 else 0.0
-        last_price = max(round(rem_plants[-1]['Variable_Cost'], 2), iex_price)
+        last_price = max(round(rem_plants[-1]['Variable_Cost'], 2), iex_price) if rem_plants else iex_price
         cost_per_block = round((must['total_cost'] + iex_cost + rem_cost) / banked_kwh, 2) if banked_kwh else 0.0
-        backdown_unit = sum([p['backdown_unit'] for p in rem_plants])
+        backdown_unit = sum([p.get('backdown_unit', 0) for p in rem_plants])
         # min_backdown_cost will be minimum of backdown_cost for plants that have a backdown_unit > 0
         min_backdown_cost = min(
-            (p['backdown_rate'] for p in rem_plants if p['backdown_unit'] > 0),
+            (p['backdown_rate'] for p in rem_plants if p.get('backdown_unit', 0) > 0),
             default=0.0
         )
 
@@ -385,8 +419,6 @@ def get_demand():
             'Backdown_Unit': round(backdown_unit, 2) if banking_unit > 0 else 0.0
         })
 
-        cursor.close()
-        conn.close()
         return jsonify(result), 200
 
     except mysql.connector.Error as err:
@@ -395,7 +427,7 @@ def get_demand():
         return jsonify({'error': str(e)}), 500
     finally:
         if 'cursor' in locals(): cursor.close()
-        if 'conn' in locals(): conn.close()
+        if 'conn' in locals() and conn.is_connected(): conn.close()
 
 
 @procurementAPI.route('/range', methods=['GET'])
