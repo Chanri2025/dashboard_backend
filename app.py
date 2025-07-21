@@ -177,4 +177,4 @@ def hello_world():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, threaded=True, debug=True)  # Run the app on all available IP addresses
+    app.run(host='0.0.0.0', port=5000, debug=True)  # Run the app on all available IP addresses

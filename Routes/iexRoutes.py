@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request
 import os
 from dotenv import load_dotenv
 from pymongo import MongoClient
+from bson.decimal128 import Decimal128
 
 # Create a Blueprint
 iexApi = Blueprint('iex', __name__)
@@ -17,24 +18,49 @@ client = MongoClient(mongo_uri)
 db = client["powercasting"]
 
 
+def _convert_decimal128(obj):
+    """
+    Recursively convert any Decimal128 in a dict or list into float.
+    """
+    if isinstance(obj, Decimal128):
+        return float(obj.to_decimal())
+    if isinstance(obj, dict):
+        return {k: _convert_decimal128(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_convert_decimal128(v) for v in obj]
+    return obj
+
+
+def to_float(val):
+    """
+    Convert a Decimal128 (or other numeric) into a Python float.
+    """
+    if isinstance(val, Decimal128):
+        return float(val.to_decimal())
+    try:
+        return float(val or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 @iexApi.route('/all', methods=['GET'])
 def get_price_data():
     try:
-        # Connect to MongoDB and get the IEX_Price collection
-        price_collection = db["IEX_Price"]
+        # Query all documents (excluding the _id)
+        raw_docs = list(db["IEX_Price"].find({}, {'_id': 0}))
 
-        # Query all documents from the collection
-        price_data = list(price_collection.find({}, {'_id': 0}))
+        # First, convert any Decimal128 → float, recursively
+        clean_docs = [_convert_decimal128(doc) for doc in raw_docs]
 
-        # If MongoDB returns dates as datetime objects, convert them to strings
-        for item in price_data:
-            if 'TimeStamp' in item and isinstance(item['TimeStamp'], datetime):
-                item['TimeStamp'] = item['TimeStamp'].strftime("%Y-%m-%d %H:%M:%S")
+        # Then convert datetime timestamps to strings
+        for item in clean_docs:
+            ts = item.get('TimeStamp')
+            if isinstance(ts, datetime):
+                item['TimeStamp'] = ts.strftime("%Y-%m-%d %H:%M:%S")
 
-        return jsonify(price_data), 200
+        return jsonify(clean_docs), 200
 
     except Exception as e:
-        # Handle any errors
         return jsonify({"error": str(e)}), 500
 
 
@@ -103,32 +129,52 @@ def get_demand_range():
 @iexApi.route('/dashboard', methods=['GET'])
 def get_dashboard():
     try:
-        # Query MongoDB IEX_Price collection
         price_collection = db["IEX_Price"]
 
-        # Use MongoDB aggregation to calculate averages
-        pipeline = [
-            {
-                "$group": {
-                    "_id": None,
-                    "Avg_Price": {"$avg": "$Actual"},
-                    "Avg_Pred_Price": {"$avg": "$Pred"}
-                }
+        # Parse optional start/end timestamps
+        start = request.args.get('start')
+        end = request.args.get('end')
+
+        match_stage = {}
+        if start:
+            start_dt = datetime.strptime(start, "%Y-%m-%d %H:%M:%S")
+            match_stage.setdefault("TimeStamp", {})["$gte"] = start_dt
+        if end:
+            end_dt = datetime.strptime(end, "%Y-%m-%d %H:%M:%S")
+            match_stage.setdefault("TimeStamp", {})["$lte"] = end_dt
+
+        # Build aggregation pipeline
+        pipeline = []
+        if match_stage:
+            pipeline.append({"$match": match_stage})
+        pipeline.append({
+            "$group": {
+                "_id": None,
+                "Avg_Price": {"$avg": "$Actual"},
+                "Avg_Pred_Price": {"$avg": "$Pred"}
             }
-        ]
+        })
 
         result = list(price_collection.aggregate(pipeline))
 
         if not result:
+            # No data in range (or at all)
             return jsonify({"Avg_Price": 0, "Avg_Pred_Price": 0}), 200
 
-        # Format the result
+        avg_doc = result[0]
+        avg_price = to_float(avg_doc.get("Avg_Price"))
+        avg_pred_price = to_float(avg_doc.get("Avg_Pred_Price"))
+
         rows = {
-            "Avg_Price": round(float(result[0]["Avg_Price"]), 2),
-            "Avg_Pred_Price": round(float(result[0]["Avg_Pred_Price"]), 2)
+            "Avg_Price": round(avg_price, 2),
+            "Avg_Pred_Price": round(avg_pred_price, 2)
         }
 
         return jsonify(rows), 200
+
+    except ValueError as ve:
+        # Bad timestamp format
+        return jsonify({"error": f"Invalid timestamp: {ve}"}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -136,21 +182,36 @@ def get_dashboard():
 @iexApi.route("/quantity", methods=["GET"])
 def get_quantity_data():
     try:
-        # Query MongoDB IEX_Generation collection
-        iex_collection = db["IEX_Generation"]
+        # Parse optional start/end filters
+        start = request.args.get('start')
+        end = request.args.get('end')
+        match = {}
+        if start:
+            try:
+                start_dt = datetime.strptime(start, "%Y-%m-%d %H:%M:%S")
+            except ValueError as ve:
+                return jsonify({'error': f'Invalid start timestamp: {ve}'}), 400
+            match.setdefault("TimeStamp", {})["$gte"] = start_dt
+        if end:
+            try:
+                end_dt = datetime.strptime(end, "%Y-%m-%d %H:%M:%S")
+            except ValueError as ve:
+                return jsonify({'error': f'Invalid end timestamp: {ve}'}), 400
+            match.setdefault("TimeStamp", {})["$lte"] = end_dt
 
-        # Get all documents, excluding _id field
-        cursor = iex_collection.find({}, {"_id": 0})
+        # Fetch and filter
+        raw_docs = list(db["IEX_Generation"].find(match if match else {}, {"_id": 0}))
 
-        # Convert to list and format datetime fields
-        rows = []
-        for doc in cursor:
-            # Convert datetime objects to strings
-            if "TimeStamp" in doc and isinstance(doc["TimeStamp"], datetime):
-                doc["TimeStamp"] = doc["TimeStamp"].strftime("%Y-%m-%d %H:%M:%S")
+        # 1) Convert Decimal128 → float
+        clean_docs = [_convert_decimal128(doc) for doc in raw_docs]
 
-            rows.append(doc)
+        # 2) Format datetime to string
+        for doc in clean_docs:
+            ts = doc.get("TimeStamp")
+            if isinstance(ts, datetime):
+                doc["TimeStamp"] = ts.strftime("%Y-%m-%d %H:%M:%S")
 
-        return jsonify(rows), 200
+        return jsonify(clean_docs), 200
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
