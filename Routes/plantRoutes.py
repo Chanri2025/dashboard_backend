@@ -46,45 +46,6 @@ def get_all_plant_data():
         return jsonify({"error": str(e)}), 500
 
 
-@plantAPI.route('/exchange', methods=['GET'])
-def get_exchange_data():
-    start_date = request.args.get('start_date')
-    end_date = request.args.get('end_date')
-    cap_price = request.args.get('cap_price')
-    if not start_date or not end_date:
-        return jsonify({"error": "Start date and end date parameters are required"}), 400
-
-    try:
-        conn = mysql.connector.connect(**db_config)
-        cursor = conn.cursor(dictionary=True)
-
-        # Fetch the sum of Demand(Pred) within the date range
-        sum_query = "SELECT `TimeStamp`, `Qty_Pred`, `Pred_Price` FROM iex_data WHERE `TimeStamp` BETWEEN %s AND %s "
-        cursor.execute(sum_query, (start_date, end_date))
-        sum_result = cursor.fetchall()
-
-        # Make an empty list to store the data which is less than the cap price otherwise keep them as 0
-        for i in range(len(sum_result)):
-            if sum_result[i]['Pred_Price'] > float(cap_price):
-                sum_result[i]['Pred_Price'] = -1
-            else:
-                sum_result[i]['Qty_Pred'] = round(sum_result[i]['Qty_Pred'] * 1000 * 0.25, 3)
-        cursor.close()
-        conn.close()
-
-        # Combine the data and sum into a single response
-        response = {
-            "start_date": start_date,
-            "end_date": end_date,
-            "cap_price": cap_price,
-            "exchange_data": sum_result,
-        }
-        return jsonify(response), 200
-    except mysql.connector.Error as err:
-        return jsonify({"error": str(err)})
-    except Exception as e:
-        return jsonify({"error": str(e)})
-
 
 @plantAPI.route('/', methods=['GET'])
 def get_plant_data():

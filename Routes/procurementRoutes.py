@@ -5,7 +5,8 @@ from datetime import datetime
 from collections import OrderedDict
 from dotenv import load_dotenv
 import os
-
+from bson import Decimal128
+from decimal import Decimal
 from pymongo import MongoClient
 
 # ----------------------------- Blueprint Setup -----------------------------
@@ -306,6 +307,17 @@ def get_other_run(net_demand: float, timestamp: str) -> Dict[str, Any]:
     return allocate_generation(plants, float(net_demand), backdown_table)
 
 
+def to_float(val):
+    """
+    Convert Mongo’s Decimal128 (or plain numbers/strings) into a Python float.
+    """
+    if isinstance(val, Decimal128):
+        # first get a Decimal, then cast
+        return float(val.to_decimal())
+    # if it’s already a Decimal, or an int/float/string
+    return float(val or 0)
+
+
 @procurementAPI.route('/', methods=['GET'])
 def get_demand():
     start_date = request.args.get('start_date')
@@ -326,39 +338,29 @@ def get_demand():
         if not demand_data:
             return jsonify({'error': 'No demand data found for the given date'}), 404
 
-        # Create demand_row similar to MySQL version
-        demand_row = {
-            "TimeStamp": start_date,
-            "Demand(Actual)": demand_data.get("Demand(Actual)", 0),
-            "Demand(Pred)": demand_data.get("Demand(Pred)", 0)
-        }
+        # Safely pull out actual & predicted demand
+        d_actual = to_float(demand_data.get("Demand(Actual)", 0))
+        d_pred = to_float(demand_data.get("Demand(Pred)", 0))
 
         # Fetch banking data from MongoDB
-        banking_collection = db["Banking_Data"]
-        bank_data = banking_collection.find_one({"TimeStamp": start_date_dt})
+        bank_doc = db["Banking_Data"].find_one({"TimeStamp": start_date_dt})
+        banking_unit = round(to_float(bank_doc.get("Banking_Unit", 0)) if bank_doc else 0.0, 3)
 
-        # Format similar to MySQL result
-        bank_row = {'Banking_Unit': 0}
-        if bank_data and "Banking_Unit" in bank_data:
-            bank_row = {'Banking_Unit': bank_data["Banking_Unit"]}
+        # Convert to kWh
+        actual_kwh = round(d_actual * 1000 * 0.25, 3)
+        pred_kwh = round(d_pred * 1000 * 0.25, 3)
 
-        banking_unit = bank_row.get('Banking_Unit', 0) or 0
-
-        # convert to kWh
-        actual_kwh = round(float(demand_row['Demand(Actual)']) * 1000 * 0.25, 3)
-        pred_kwh = round(float(demand_row['Demand(Pred)']) * 1000 * 0.25, 3)
-
-        # select which demand to bank: only use pred_kwh if we actually have a non-zero actual_kwh
+        # Decide which to bank
         base_kwh = pred_kwh if actual_kwh == 0 else actual_kwh
         banked_kwh = base_kwh - banking_unit
 
         # must-run
-        must = get_must_run(banked_kwh, demand_row['TimeStamp'])
+        must = get_must_run(banked_kwh, start_date)
         if 'error' in must:
             return jsonify({'error': must['error']}), 500
 
         # IEX
-        iex_list = get_exchange_data(demand_row['TimeStamp'], price_cap)
+        iex_list = get_exchange_data(start_date, price_cap)
         if isinstance(iex_list, dict) and 'error' in iex_list:
             return jsonify({'error': iex_list['error']}), 500
         iex = iex_list[0] if iex_list else {'Pred_Price': 0.0, 'Qty_Pred': 0.0}
@@ -378,7 +380,7 @@ def get_demand():
 
         # ─────────────── BANKING‐CHECK FOR BACKDOWN ───────────────
         if banking_unit == 0:
-            # zero out each plant's backdown_cost
+            # zero out each plant's back down_cost
             for p in rem_plants:
                 p['backdown_cost'] = 0.0
             total_backdown = 0.0
@@ -397,7 +399,7 @@ def get_demand():
         )
 
         result = OrderedDict({
-            'TimeStamp': demand_row['TimeStamp'],
+            'TimeStamp': start_date,
             'Demand(Actual)': actual_kwh,
             'Demand(Pred)': pred_kwh,
             'Banking_Unit': banking_unit,
