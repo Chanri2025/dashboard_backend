@@ -44,7 +44,7 @@ def get_lt_consumption_from_mongo():
         }), 400
 
     # 3️⃣ Optional consumer_id
-    consumer_id = request.args.get('consumer_id')
+    consumer_id = request.args.get('consumer_id').upper()
 
     try:
         # 4️⃣ Connect to MongoDB
