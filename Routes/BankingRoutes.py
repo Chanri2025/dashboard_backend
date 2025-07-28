@@ -21,7 +21,8 @@ def fetch_banked_units(ts):
     )
     if not rec:
         raise LookupError(f"No banking_data for {ts}")
-    bu = rec.get("banked_units", 0.0) or 0.0
+    bu_raw = rec.get("banked_units", 0.0) or 0.0
+    bu=round(bu_raw,3)
     return 0.0 if math.isnan(bu) else bu
 
 
@@ -105,14 +106,14 @@ def compute_banking_cost(
     if banked <= 0:
         return 0.0, dsm
 
-    weighted_avg = (total_backdown_cost / total_backdown_units) if total_backdown_units > 0 else 0.0
+    weighted_avg = round((total_backdown_cost / total_backdown_units),2) if total_backdown_units > 0 else 0.0
     print("Banking Data: ", banked)
     print("Weighted Average Cost: ", weighted_avg)
     print("SG: ", scheduled_generation)
     print("Drawl: ", drawl)
     print("Schedule > Drawl", scheduled_generation > drawl)
     if scheduled_generation > drawl:
-        sd = scheduled_generation - drawl
+        sd = round(scheduled_generation - drawl,6)
         print("SG - Drawl: ", sd)
         print("Schedule - Drawl (S-D)> Banking", sd > banked)
         Balanced_Unit = banked - sd
@@ -125,28 +126,28 @@ def compute_banking_cost(
                 dsm = banked
                 return banked, dsm
         else:
+            Banking_Cost = round(weighted_avg * Balanced_Unit,2)
             if Balanced_Unit < total_backdown_units:
-                print("Banked Cost: weighted_avg * Balanced_Unit: ",weighted_avg * Balanced_Unit)
-                return weighted_avg * Balanced_Unit, dsm
+                print("Banked Cost: weighted_avg * Balanced_Unit: ", Banking_Cost)
+                return Banking_Cost, dsm
             else:
-                cost = weighted_avg * Balanced_Unit + market_purchase * min(dam, rtm)
-                print("Banked Cost: weighted_avg * Balanced_Unit + market_purchase * min(dam, rtm): ", cost)
-                return cost, dsm
+                Banking_Cost = round(weighted_avg * Balanced_Unit + market_purchase * min(dam, rtm),2)
+                print("Banked Cost: weighted_avg * Balanced_Unit + market_purchase * min(dam, rtm): ", Banking_Cost)
+                return Banking_Cost, dsm
 
 
     if scheduled_generation <= drawl and total_backdown_units < banked:
         print('''
             Backdown (BD) < Banking and Schedule > Drawl
             ''')
-        cost = weighted_avg * total_backdown_units + market_purchase * min(dam, rtm)
+        cost = round(weighted_avg * total_backdown_units + market_purchase * min(dam, rtm),2)
         print("Banking Cost: weighted_avg * total_backdown_units + market_purchase * min(dam, rtm): ", cost)
     else:
         # diff = total_backdown_units - banked
-        cost = banked * weighted_avg
+        cost = round(banked * weighted_avg,2)
         print("Cost: banked * weighted_avg: ",cost)
 
     return cost, dsm
-
 
 @bankingAPI.route('/calculate', methods=['GET'])
 def calculate_banked():
@@ -169,6 +170,8 @@ def calculate_banked():
     print("TimeStamp: ", raw)
     print("Backdown Units: ",total_units)
     print("Backdown Cost: ", total_cost)
+    print("Scheduled_Generation", sg)
+    print("Drawl: ", dr)
     banking_cost, dsm = compute_banking_cost(
         banked, total_units, total_cost,
         sg, dr, dam, rtm, mpur, ts
