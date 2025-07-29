@@ -84,6 +84,7 @@ def fetch_market_prices(ts):
     market_purchase = rec.get("Market_Purchase", 0.0) or 0.0
     return dam, rtm, market_purchase
 
+
 def upsert_battery_status(ts, banked_units, cycle):
     """
     Compute new Units_Available and upsert Battery_Status.
@@ -98,9 +99,10 @@ def upsert_battery_status(ts, banked_units, cycle):
             new_units = prev_units - banked_units
             print(f"Charging battery by {banked_units} units, units avaiable {new_units}")
         else:
-            new_units = prev_units - (banked_units-prev_units)
-            print(f"Charging battery by {prev_units} units, units avaiable {new_units}, {(banked_units-prev_units)} going to DSM")
-    elif cycle=="USE":
+            new_units = prev_units - (banked_units - prev_units)
+            print(
+                f"Charging battery by {prev_units} units, units avaiable {new_units}, {(banked_units - prev_units)} going to DSM")
+    elif cycle == "USE":
         new_units = prev_units
         print(f"No Charging taking place, battery is in use state.")
     else:
@@ -114,6 +116,12 @@ def upsert_battery_status(ts, banked_units, cycle):
         upsert=True
     )
     print(f"Upserted Battery_Status @ {ts}: Cycle={cycle}, Units_Available={new_units}")
+
+
+def in_dsm_window(ts):
+    t = ts.time()
+    return (time(9, 0) <= t < time(11, 0)) or (time(18, 0) <= t < time(20, 0))
+
 
 @adjustingAPI.route('/calculate', methods=['GET'])
 def calculate_adjustment():
@@ -151,40 +159,41 @@ def calculate_adjustment():
         plants[0]['VC'], 2
     ) if total_backdown_units > 0 else 0.0
 
-    print("TimeStamp: ",ts)
-    print("Total Backdown Unit: ",total_backdown_units)
+    print("TimeStamp: ", ts)
+    print("Total Backdown Unit: ", total_backdown_units)
     print("Total Backdown Cost: ", total_backdown_cost)
+
     # 6) fetch market prices
     dam, rtm, _ = fetch_market_prices(ts)
-    print("Adjustement Charges: ",adjustment_unit)
-    print("DAM: ",dam)
-    print("RTM: ",rtm)
-    print("MOD: ",mod_price)
-    print("Battery Data: ",status_doc)
+    print("Adjustement Charges: ", adjustment_unit)
+    print("DAM: ", dam)
+    print("RTM: ", rtm)
+    print("MOD: ", mod_price)
+    print("Battery Data: ", status_doc)
 
     # 7) prep rates
     highest_rate = max(mod_price, dam, rtm)
     BATTERY_CHARGE_RATE = 4.0
-
     # 8) compute adjustment_charges
-    if cycle == "USE":
+    if (cycle == "USE") & in_dsm_window(ts):
         # entire adjustment at highest rate
         adjustment_charges = round(adjustment_unit * highest_rate, 2)
-        print("Adjustment Charges: adjustment_unit * highest_rate",adjustment_charges)
-        battery_used = 0.0
-        balance_unit = adjustment_unit
+        print("Adjustment Charges: adjustment_unit * highest_rate", adjustment_charges)
+        balance_unit = 0.0
+        battery_used = adjustment_unit
+        upsert_battery_status(ts, adjustment_unit, "CHARGE")
     else:
         # consume from battery first
-        print("adjustment_unit < available_units: ",adjustment_unit <= available_units)
+        print("adjustment_unit < available_units: ", adjustment_unit <= available_units)
         if adjustment_unit < available_units:
-            battery_used = adjustment_unit
+            battery_used = 0.0
             balance_unit = 0.0
-            upsert_battery_status(ts,adjustment_unit,"CHARGE")
+            upsert_battery_status(ts, adjustment_unit, "NO CHARGE")
             adjustment_charges = round(battery_used * BATTERY_CHARGE_RATE, 2)
         else:
-            battery_used = available_units
+            battery_used = 0.0
             balance_unit = adjustment_unit - available_units
-            upsert_battery_status(ts, balance_unit, "CHARGE")
+            upsert_battery_status(ts, balance_unit, "NO CHARGE")
             adjustment_charges = round(
                 battery_used * BATTERY_CHARGE_RATE
                 + balance_unit * highest_rate,
@@ -194,7 +203,7 @@ def calculate_adjustment():
     # 9) respond
     return jsonify({
         "Backdown_units": total_backdown_units,
-        "Backdown_cost":total_backdown_cost,
+        "Backdown_cost": total_backdown_cost,
         "Timestamp": ts.strftime("%Y-%m-%d %H:%M"),
         "adjustment_unit": adjustment_unit,
         "battery_cycle": cycle,
