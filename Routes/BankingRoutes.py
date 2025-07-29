@@ -192,6 +192,7 @@ def compute_banking_cost(
             return cost,dsm,cycle
 
     else:
+        print("total_backdown_units < banked_units: ",total_backdown_units < banked_units)
         if total_backdown_units < banked_units:
             cycle = "NO CHARGE"
             cost = round(weighted_avg * total_backdown_units + market_purchase * min(dam, rtm), 2)
