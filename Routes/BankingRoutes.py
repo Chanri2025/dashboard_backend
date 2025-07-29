@@ -3,7 +3,7 @@ from pymongo import MongoClient, UpdateOne
 from dotenv import load_dotenv
 import os
 import math
-from datetime import timedelta, time
+from datetime import time
 
 from Helpers.helpers import parse_start_timestamp
 
@@ -72,8 +72,8 @@ def fetch_market_prices(ts):
         raise LookupError(f"No market_price_data for {ts}")
     dam = rec.get("DAM", 0.0) or 0.0
     rtm = rec.get("RTM", 0.0) or 0.0
-    mpur = rec.get("Market_Purchase", 0.0) or 0.0
-    return dam, rtm, mpur
+    market_purchase = rec.get("Market_Purchase", 0.0) or 0.0
+    return dam, rtm, market_purchase
 
 
 def fetch_battery_status(ts):
@@ -97,88 +97,114 @@ def in_dsm_window(ts):
     return (time(9, 0) <= t < time(11, 0)) or (time(18, 0) <= t < time(20, 0))
 
 
-def upsert_battery_status(ts, banked_units):
+def upsert_battery_status(ts, banked_units, cycle):
     """
-    Compute new Units_Available based on the previous status,
-    then upsert for the current ts.
+    Compute new Units_Available and upsert Battery_Status.
+    If cycle == "USE": subtract banked_units.
+    If cycle == "CHARGE": add banked_units.
     """
     prev = fetch_battery_status(ts)
     prev_units = prev.get("Units_Available", 0.0) or 0.0
-    cycle = prev.get("Cycle", "USE")
 
-    # subtract only if cycle was USE
-    if cycle == "USE":
-        new_units = prev_units - banked_units
+    if cycle == "CHARGE":
+        if prev_units > banked_units:
+            new_units = prev_units - banked_units
+            print(f"Charging battery by {banked_units} units, units avaiable {new_units}")
+        else:
+            new_units = prev_units - (banked_units-prev_units)
+            print(f"Charging battery by {prev_units} units, units avaiable {new_units}, {(banked_units-prev_units)} going to DSM")
+    elif cycle=="USE":
+        new_units = prev_units
+        print(f"No Charging taking place, battery is in use state.")
     else:
         new_units = prev_units
+        print(f"No Charging taking place")
 
-    # round to 3 decimals (or adjust as needed)
     new_units = round(new_units, 3)
-
-    # upsert in Battery_Status
     power_db["Battery_Status"].update_one(
         {"Timestamp": ts},
-        {
-            "$set": {
-                "Units_Available": new_units,
-                "Cycle": cycle
-            }
-        },
+        {"$set": {"Units_Available": new_units, "Cycle": cycle}},
         upsert=True
     )
     print(f"Upserted Battery_Status @ {ts}: Cycle={cycle}, Units_Available={new_units}")
 
 
 def compute_banking_cost(
-        banked, total_units, total_cost,
-        sg, dr, dam, rtm, mpur, ts
+        banked_units, total_backdown_units, total_cost,
+        scheduled_generation, drawl, dam, rtm, market_purchase, ts
 ):
-    dsm = 0.0
-    if banked <= 0:
-        return 0.0, dsm
-
-    weighted_avg = round((total_cost / total_units), 2) if total_units > 0 else 0.0
-    print("Banking Data: ", banked)
+    """
+    Returns (cost, dsm_units, cycle)
+    """
+    print("Banking Data: ", banked_units)
+    weighted_avg = round((total_cost / total_backdown_units), 2) if total_backdown_units > 0 else 0.0
     print("Weighted Average Cost: ", weighted_avg)
-    print("SG: ", sg)
-    print("Drawl: ", dr)
-    print("Schedule > Drawl", sg > dr)
+    print("SG: ", scheduled_generation)
+    print("Drawl: ", drawl)
+    print("Schedule > Drawl:", scheduled_generation > drawl)
 
     cost = 0.0
+    dsm = 0.0
+    cycle = "NO CHARGE"
 
-    if sg > dr:
-        sd = round(sg - dr, 6)
+    if banked_units <= 0:
+        return cost, dsm, cycle
+
+    if scheduled_generation > drawl:
+        sd = round(scheduled_generation - drawl, 3)
         print("SG - Drawl: ", sd)
-        print("Schedule - Drawl (S-D)> Banking", sd > banked)
-        balanced_unit = banked - sd
-        print("Balanced Units: ", balanced_unit)
-        print("Balanced Units < Total Backdown Units", balanced_unit < total_units)
+        balanced_unit = banked_units - sd
+        print("(SG - Drawl) > Banking Units: ", sd > banked_units)
 
-        if sd > banked:
-            batt = fetch_battery_status(ts)
-            print("Battery Status: ", batt)
-            if in_dsm_window(ts):
-                dsm = banked
-                cost = banked
 
-        else:
-            cost = round(weighted_avg * balanced_unit, 2)
-            if balanced_unit < total_units:
-                print("Banked Cost: weighted_avg * balanced_unit: ", cost)
+        if sd > banked_units:
+            print("SD > banked, checking for charge scenario")
+            prev = fetch_battery_status(ts)
+            prev_units = prev.get("Units_Available", 0.0) or 0.0
+            print("Previous Units Available:", prev_units)
+
+            # Charge if enough capacity and outside DSM window
+            if (prev_units >= banked_units) and (not in_dsm_window(ts)):
+                cycle = "CHARGE"
+                cost = 0.0
+                print("Entering CHARGE cycle, cost set to 0")
+                upsert_battery_status(ts, banked_units, cycle)
+                return cost,dsm,cycle
             else:
-                cost = round(weighted_avg * balanced_unit + mpur * min(dam, rtm), 2)
-                print("Banked Cost: weighted_avg * balanced_unit + mpur * min(dam, rtm): ", cost)
-
-    elif total_units < banked:
-        print("Backdown < Banking and SG<=Drawl")
-        cost = round(weighted_avg * total_units + mpur * min(dam, rtm), 2)
-        print("Banking Cost: weighted_avg * total_units + mpur * min(dam, rtm): ", cost)
+                if in_dsm_window(ts):
+                    cycle = "USE"
+                    dsm = banked_units
+                    cost = 0.0
+                    print("In DSM window, using DSM:", dsm)
+                    upsert_battery_status(ts,banked_units, cycle)
+                return cost, dsm, cycle
+        else:
+            # NO CHARGE
+            print("Balanced Units: ", balanced_unit)
+            cycle = "NO CHARGE"
+            print(cycle)
+            cost = round(weighted_avg * balanced_unit, 2)
+            print("Banked Cost: (balanced_unit * weighted_avg):", cost)
+            if balanced_unit >= total_backdown_units:
+                cost = round(weighted_avg * balanced_unit + market_purchase * min(dam, rtm), 2)
+                print("Banked cost: weighted_avg * balanced_unit + market_purchase * min(dam, rtm):", cost)
+            upsert_battery_status(ts, banked_units, cycle)
+            return cost,dsm,cycle
 
     else:
-        cost = round(banked * weighted_avg, 2)
-        print("Cost: banked * weighted_avg: ", cost)
+        if total_backdown_units < banked_units:
+            cycle = "NO CHARGE"
+            cost = round(weighted_avg * total_backdown_units + market_purchase * min(dam, rtm), 2)
+            print("Banked cost: Backdown < Banking and SG<=Drawl, cost:", cost)
+            upsert_battery_status(ts, banked_units, cycle)
+            return cost, dsm, cycle
+        else:
+            cycle = "NO CHARGE"
+            cost = round(banked_units * weighted_avg, 2)
+            upsert_battery_status(ts, banked_units, cycle)
+            print("Banked cost: (banked * weighted_avg):", cost)
 
-    return cost, dsm
+    return cost, dsm, cycle
 
 
 @bankingAPI.route('/calculate', methods=['GET'])
@@ -190,36 +216,39 @@ def calculate_banked():
         return abort(400, description=str(e))
 
     try:
-        banked = fetch_banked_units(ts)
+        banked_units = fetch_banked_units(ts)
         plants = fetch_plant_data(ts)
-        sg, dr = fetch_demand_drawl(ts)
-        dam, rtm, mpur = fetch_market_prices(ts)
+        scheduled_generation, drawl = fetch_demand_drawl(ts)
+        dam, rtm, marketpurchase = fetch_market_prices(ts)
     except LookupError as e:
         return abort(404, description=str(e))
 
-    total_units = sum(p["backdown_units"] for p in plants)
-    total_cost = sum(p["backdown_cost"] for p in plants)
+    backdown_units = sum(p["backdown_units"] for p in plants)
+    backdown_cost = sum(p["backdown_cost"] for p in plants)
 
     print("Timestamp: ", raw)
-    print("Backdown Units:", total_units)
-    print("Backdown Cost: ", total_cost)
-    print("Scheduled_Generation", sg)
-    print("Drawl: ", dr)
+    print("Backdown Units:", backdown_units)
+    print("Backdown Cost: ", backdown_cost)
+    print("Scheduled_Generation:", scheduled_generation)
+    print("Drawl:", drawl)
 
-    banking_cost, dsm = compute_banking_cost(
-        banked, total_units, total_cost,
-        sg, dr, dam, rtm, mpur, ts
+    banking_cost, dsm, cycle = compute_banking_cost(
+        banked_units, backdown_units, backdown_cost,
+        scheduled_generation, drawl, dam, rtm, marketpurchase, ts
     )
-
-    # 6) upsert new battery status
-    upsert_battery_status(ts, banked)
 
     return jsonify({
         "Timestamp": ts.strftime("%Y-%m-%d %H:%M"),
-        "banked_units": banked,
-        "total_backdown_units": round(total_units, 2),
-        "total_backdown_cost": round(total_cost, 2),
+        "banked_units": banked_units,
+        "total_backdown_units": round(backdown_units, 2),
+        "total_backdown_cost": round(backdown_cost, 2),
         "banking_cost": round(banking_cost, 2),
         "DSM": round(dsm, 2),
-        "plant_backdown_data": plants
+        "plant_backdown_data": plants,
+        "schedule_generation": scheduled_generation,
+        "total_drawl": drawl,
+        "dam_rate": dam,
+        "rtm_rate": rtm,
+        "market_purchase":marketpurchase
+
     }), 200
