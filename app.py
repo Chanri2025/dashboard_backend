@@ -4,6 +4,7 @@ from flask_cors import CORS
 from pymongo import MongoClient
 
 from Routes.AdjustmentRoutes import adjustingAPI
+from Routes.consolidatedRoutes import consolidatedAPI
 from Routes.demandRoutes import demandApi
 from Routes.iexRoutes import iexApi
 from Routes.procurementRoutes import procurementAPI
@@ -43,6 +44,7 @@ app.register_blueprint(plantAPI, url_prefix='/plant')  # Registering the Plant A
 app.register_blueprint(demandApi, url_prefix='/demand')  # Registering the Demand API
 app.register_blueprint(bankingAPI, url_prefix='/banking')  # Registering the Banking API
 app.register_blueprint(adjustingAPI, url_prefix='/adjusting') # Registering the Adjusting API
+app.register_blueprint(consolidatedAPI, url_prefix='/consolidated-part') # Registering the Consolidated API
 app.register_blueprint(iexApi, url_prefix='/iex')  # Registering the IEX API
 app.register_blueprint(availabilityAPI, url_prefix='/availability')  # Registering the Plant availability factor API
 app.register_blueprint(backDownApi, url_prefix='/backdown')  # Registering the Backdown API
