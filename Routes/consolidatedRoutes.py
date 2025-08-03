@@ -14,6 +14,35 @@ power_db = client["power_casting_new"]
 
 
 # ---------- Helpers ----------
+def calculate_weighted_average_for_quantum(plants, quantum):
+    used_units = 0.0
+    total_cost = 0.0
+    total_units = 0.0
+    updated_plants = []
+
+    for plant in sorted(plants, key=lambda x: x['VC'], reverse=True):
+        available = plant.get('backdown_units', 0.0)
+        vc = plant.get('VC', 0.0)
+
+        if used_units >= quantum:
+            plant['used_for_quantum'] = 0.0
+            updated_plants.append(plant)
+            continue
+
+        use = min(quantum - used_units, available)
+        cost = use * vc
+
+        used_units += use
+        total_cost += cost
+        total_units += use
+
+        plant['used_for_quantum'] = use
+        updated_plants.append(plant)
+
+    weighted_avg = round(total_cost / total_units, 2) if total_units > 0 else 0.0
+    return weighted_avg, round(total_cost, 2), round(total_units, 2), updated_plants
+
+
 def in_dsm_window(ts):
     t = ts.time()
     return (time(9, 0) <= t < time(11, 0)) or (time(18, 0) <= t < time(20, 0))
@@ -129,17 +158,23 @@ def compute_totals(plants, plants_by_vc):
 
 def decide_banking(timestamp, banked_units, scheduled_generation, drawl, weighted_average, mod, dam, rtm,
                    market_purchase,
-                   total_backdown_units, units_available_before):
+                   total_backdown_units, total_backdown_cost, units_available_before, plants_by_vc):
     if banked_units <= 0:
         return {
-            "banking_cost": 0.0, "DSM_units": 0.0, "cycle": "NO_CHARGE",
-            "units_available_after": units_available_before
+            "banking_cost": 0.0,
+            "DSM_units": 0.0,
+            "cycle": "NO_CHARGE",
+            "units_available_after": units_available_before,
+            "weighted_average": round(weighted_average, 2),
+            "market_purchase": 0
         }
 
     s_d = max(scheduled_generation - drawl, 0.0)  # schedule surplus
     units_after = units_available_before
     banking_cost = 0.0
+    market_purchase = 0
     dsm_units = 0.0
+    weighted_average = weighted_average
     cycle = "NO_CHARGE"
 
     if s_d > 0:
@@ -153,34 +188,45 @@ def decide_banking(timestamp, banked_units, scheduled_generation, drawl, weighte
                 # dsm all banked units
                 dsm_units = banked_units
                 cycle = "USE"
-                banking_cost = 0.0
+                banking_cost = 0.0  # cost stays 0
                 upsert_battery_status(timestamp, banked_units, cycle)
-                # cost stays 0
         else:
             # s_d consumes part, rest are "balanced_units"
             balanced_units = round(banked_units - s_d, 3)
             cycle = "NO_CHARGE"
             # your original logic for pricing balanced_units:
-            banking_cost = round(weighted_average * balanced_units, 2)
+            weighted_average, total_backdown_cost, total_backdown_units, updated_plants = calculate_weighted_average_for_quantum(
+                plants_by_vc, banked_units)
+            banking_cost = round(total_backdown_cost, 2)
             if balanced_units >= total_backdown_units:
-                banking_cost = round(weighted_average * balanced_units + market_purchase * min(dam, rtm), 2)
+                # Banking cost is total backdown cost + extra-unit which is purchased from market
+                market_purchase = balanced_units - total_backdown_units
+                banking_cost = round(total_backdown_cost + market_purchase * min(dam, rtm), 2)
             upsert_battery_status(timestamp, banked_units, cycle)
     else:
         # sg <= drawl (no surplus)
         if total_backdown_units < banked_units:
+            # If backdown units are less than banked units, total_backdown cost will be taken and remaining units will be purchased from market
             cycle = "NO_CHARGE"
             upsert_battery_status(timestamp, banked_units, cycle)
-            banking_cost = round(weighted_average * total_backdown_units + market_purchase * min(dam, rtm), 2)
+            market_purchase = banked_units - total_backdown_units
+            banking_cost = round(total_backdown_cost + market_purchase * min(dam, rtm), 2)
         else:
+            # If backdown units are greater than banked units, total_backdown quantity will be used to adjust the battery banking units
             cycle = "NO_CHARGE"
             upsert_battery_status(timestamp, banked_units, cycle)
+            # weighted average cost will be used to change the banking cost
+            weighted_average, total_backdown_cost, total_backdown_units, updated_plants = calculate_weighted_average_for_quantum(
+                plants_by_vc, banked_units)
             banking_cost = round(weighted_average * banked_units, 2)
 
     return {
         "banking_cost": round(banking_cost, 2),
         "DSM_units": round(dsm_units, 2),
         "cycle": cycle,
-        "units_available_after": round(units_after, 3)
+        "units_available_after": round(units_after, 3),
+        "weighted_average": round(weighted_average, 2),
+        "market_purchase": round(market_purchase, 2)
     }
 
 
@@ -235,56 +281,56 @@ def compute_adjustment(timestamp, adjusted_units, mod, dam, rtm,
 def calculate_consolidated():
     raw = request.args.get('start_date')
     try:
-        ts = parse_start_timestamp(raw)
+        timestamp = parse_start_timestamp(raw)
     except ValueError as e:
         return abort(400, description=str(e))
 
     try:
         # Getting banked unit and adjusted units
-        banked_units, adjusted_units = fetch_banking_row(ts)
+        banked_units, adjusted_units = fetch_banking_row(timestamp)
         # Getting plants data
-        plants, plants_by_vc = fetch_plants(ts)
+        plants, plants_by_vc = fetch_plants(timestamp)
         # Getting SG and Drawl
-        sg_sched, drawl = fetch_demand_drawl(ts)
+        scheduled_generation, drawl = fetch_demand_drawl(timestamp)
         # Getting DAM, RTM, Market Purchase
-        dam, rtm, market_purchase = fetch_market_prices(ts)
+        dam, rtm, market_purchase = fetch_market_prices(timestamp)
         # Getting the Battery Details
-        battery_details = fetch_battery_status(ts)
+        battery_details = fetch_battery_status(timestamp)
     except LookupError as e:
         return abort(404, description=str(e))
 
+    # weighted_average, total_backdown_cost, total_backdown_units, updated_plants = calculate_weighted_average_for_quantum(plants_by_vc, banked_units)
     total_backdown_units, total_backdown_cost, weighted_average, mod = compute_totals(plants, plants_by_vc)
     units_left_to_charge = float(battery_details.get("Units_Available", 0.0) or 0.0)
 
     # 1) Banking (may change battery)
     bank = decide_banking(
-        ts, banked_units, sg_sched, drawl, weighted_average, mod, dam, rtm, market_purchase,
-        total_backdown_units, units_left_to_charge
+        timestamp, banked_units, scheduled_generation, drawl, weighted_average, mod, dam, rtm, market_purchase,
+        total_backdown_units, total_backdown_cost, units_left_to_charge, plants_by_vc
     )
 
     # 2) Adjustment (uses post-banking battery)
     adj = compute_adjustment(
-        ts, adjusted_units, bank["units_available_after"], mod, dam, rtm,
+        timestamp, adjusted_units, mod, dam, rtm,
     )
 
     return jsonify({
-        "Timestamp": ts.strftime("%Y-%m-%d %H:%M"),
+        "Timestamp": timestamp.strftime("%Y-%m-%d %H:%M"),
 
         # Inputs
-        "banked_units": banked_units,
-        "adjusted_units": adjusted_units,
-        "schedule_generation": sg_sched,
-        "total_drawl": drawl,
-        "dam_rate": dam,
-        "rtm_rate": rtm,
-        "market_purchase": market_purchase,
+        "banked_units": round(banked_units, 3),
+        "adjusted_units": round(adjusted_units, 3),
+        "schedule_generation": round(scheduled_generation, 3),
+        "total_drawl": round(drawl, 3),
+        "dam_rate": round(dam, 2),
+        "rtm_rate": round(rtm, 2),
 
         # Plant & totals
         "plant_backdown_data": plants,
-        "total_backdown_units": total_backdown_units,
-        "total_backdown_cost": total_backdown_cost,
-        "weighted_avg_rate": weighted_average,
-        "marginal_rate": mod,
+        "total_backdown_units": round(total_backdown_units, 3),
+        "total_backdown_cost": round(total_backdown_cost, 2),
+        "weighted_avg_rate": round(bank["weighted_average"], 2),
+        "MOD_rate": mod,
         "highest_rate": max(mod, dam, rtm),
 
         # Banking result
@@ -295,7 +341,7 @@ def calculate_consolidated():
         # Adjustment result
         "adjustment_charges": adj["adjustment_charges"],
         "battery_units_used_for_adjustment": adj["battery_used"],
-        "adjustment_balance_units": adj["balance_units"],
+        "market_purchase": adj["balance_units"] + bank["market_purchase"],
         "battery_charge_rate": adj["battery_charge_rate"],
 
         # Battery snapshot
