@@ -159,16 +159,6 @@ def compute_totals(plants, plants_by_vc):
 def decide_banking(timestamp, banked_units, scheduled_generation, drawl, weighted_average, mod, dam, rtm,
                    market_purchase,
                    total_backdown_units, total_backdown_cost, units_available_before, plants_by_vc):
-    if banked_units <= 0:
-        return {
-            "banking_cost": 0.0,
-            "DSM_units": 0.0,
-            "cycle": "NO_CHARGE",
-            "units_available_after": units_available_before,
-            "weighted_average": round(weighted_average, 2),
-            "market_purchase": 0
-        }
-
     s_d = max(scheduled_generation - drawl, 0.0)  # schedule surplus
     units_after = units_available_before
     banking_cost = 0.0
@@ -177,57 +167,67 @@ def decide_banking(timestamp, banked_units, scheduled_generation, drawl, weighte
     weighted_average = weighted_average
     cycle = "NO_CHARGE"
 
-    if s_d > 0:
-        if s_d >= banked_units:
-            if not in_dsm_window(timestamp):
-                cycle = "CHARGE"
-                banking_cost = 0.0
-                # added the banked unit to charge the battery
-                upsert_battery_status(timestamp, banked_units, cycle)
-            else:
-                # dsm all banked units
-                dsm_units = banked_units
-                cycle = "USE"
-                banking_cost = 0.0  # cost stays 0
-                upsert_battery_status(timestamp, banked_units, cycle)
-        else:
-            # s_d consumes part, rest are "balanced_units"
-            balanced_units = round(banked_units - s_d, 3)
-            cycle = "NO_CHARGE"
-            # your original logic for pricing balanced_units:
-            weighted_average, total_backdown_cost, total_backdown_units, updated_plants = calculate_weighted_average_for_quantum(
-                plants_by_vc, banked_units)
-            banking_cost = round(total_backdown_cost, 2)
-            if balanced_units >= total_backdown_units:
-                # Banking cost is total backdown cost + extra-unit which is purchased from market
-                market_purchase = balanced_units - total_backdown_units
-                banking_cost = round(total_backdown_cost + market_purchase * min(dam, rtm), 2)
-            upsert_battery_status(timestamp, banked_units, cycle)
+    if banked_units <= 0:
+        return {
+            "banking_cost": 0.0,
+            "DSM_units": 0.0,
+            "cycle": cycle,
+            "units_available_after": units_available_before,
+            "weighted_average": round(weighted_average, 2),
+            "market_purchase": 0
+        }
     else:
-        # sg <= drawl (no surplus)
-        if total_backdown_units < banked_units:
-            # If backdown units are less than banked units, total_backdown cost will be taken and remaining units will be purchased from market
-            cycle = "NO_CHARGE"
-            upsert_battery_status(timestamp, banked_units, cycle)
-            market_purchase = banked_units - total_backdown_units
-            banking_cost = round(total_backdown_cost + market_purchase * min(dam, rtm), 2)
+        if s_d > 0:
+            if s_d >= banked_units:
+                if not in_dsm_window(timestamp):
+                    cycle = "CHARGE"
+                    banking_cost = 0.0
+                    # added the banked unit to charge the battery
+                    upsert_battery_status(timestamp, banked_units, cycle)
+                else:
+                    # dsm all banked units
+                    dsm_units = banked_units
+                    cycle = "NO_CHARGE"
+                    banking_cost = 0.0  # cost stays 0
+                    upsert_battery_status(timestamp, banked_units, cycle)
+            else:
+                # s_d consumes part, rest are "balanced_units"
+                balanced_units = round(banked_units - s_d, 3)
+                cycle = "NO_CHARGE"
+                # your original logic for pricing balanced_units:
+                weighted_average, total_backdown_cost, total_backdown_units, updated_plants = calculate_weighted_average_for_quantum(
+                    plants_by_vc, banked_units)
+                banking_cost = round(total_backdown_cost, 2)
+                if balanced_units >= total_backdown_units:
+                    # Banking cost is total backdown cost + extra-unit which is purchased from market
+                    market_purchase = balanced_units - total_backdown_units
+                    banking_cost = round(total_backdown_cost + market_purchase * min(dam, rtm), 2)
+                upsert_battery_status(timestamp, banked_units, cycle)
         else:
-            # If backdown units are greater than banked units, total_backdown quantity will be used to adjust the battery banking units
-            cycle = "NO_CHARGE"
-            upsert_battery_status(timestamp, banked_units, cycle)
-            # weighted average cost will be used to change the banking cost
-            weighted_average, total_backdown_cost, total_backdown_units, updated_plants = calculate_weighted_average_for_quantum(
-                plants_by_vc, banked_units)
-            banking_cost = round(weighted_average * banked_units, 2)
+            # sg <= drawl (no surplus)
+            if total_backdown_units < banked_units:
+                # If backdown units are less than banked units, total_backdown cost will be taken and remaining units will be purchased from market
+                cycle = "NO_CHARGE"
+                upsert_battery_status(timestamp, banked_units, cycle)
+                market_purchase = banked_units - total_backdown_units
+                banking_cost = round(total_backdown_cost + market_purchase * min(dam, rtm), 2)
+            else:
+                # If backdown units are greater than banked units, total_backdown quantity will be used to adjust the battery banking units
+                cycle = "NO_CHARGE"
+                upsert_battery_status(timestamp, banked_units, cycle)
+                # weighted average cost will be used to change the banking cost
+                weighted_average, total_backdown_cost, total_backdown_units, updated_plants = calculate_weighted_average_for_quantum(
+                    plants_by_vc, banked_units)
+                banking_cost = round(weighted_average * banked_units, 2)
 
-    return {
-        "banking_cost": round(banking_cost, 2),
-        "DSM_units": round(dsm_units, 2),
-        "cycle": cycle,
-        "units_available_after": round(units_after, 3),
-        "weighted_average": round(weighted_average, 2),
-        "market_purchase": round(market_purchase, 2)
-    }
+        return {
+            "banking_cost": round(banking_cost, 2),
+            "DSM_units": round(dsm_units, 2),
+            "cycle": cycle,
+            "units_available_after": round(units_after, 3),
+            "weighted_average": round(weighted_average, 2),
+            "market_purchase": round(market_purchase, 2)
+        }
 
 
 def compute_adjustment(timestamp, adjusted_units, mod, dam, rtm,
@@ -239,6 +239,7 @@ def compute_adjustment(timestamp, adjusted_units, mod, dam, rtm,
     balance_units = 0.0
     adj_cost = 0.0
 
+    print(adjusted_units,units_before)
     # If there is no Adjusted Units
     if adjusted_units <= 0:
         return {
@@ -249,32 +250,32 @@ def compute_adjustment(timestamp, adjusted_units, mod, dam, rtm,
             "highest_rate": highest_rate,
             "battery_charge_rate": 4.0
         }
-
-    if in_dsm_window(timestamp):
-        if adjusted_units < units_before:
-            adj_cost = round(adjusted_units * battery_charge_rate, 2)
-            # this means that unit will be deducted from battery
-            cycle = "USE"
-            upsert_battery_status(timestamp, adjusted_units, cycle)
-            units_before = units_before - adjusted_units
-        else:
-            # if enough units not available for deduction from battery
-            balance_units = adjusted_units - units_before
-            cycle = "USE"
-            upsert_battery_status(timestamp, balance_units, cycle)
-            adj_cost = units_before * battery_charge_rate + balance_units * highest_rate
-
     else:
-        adj_cost = round(adjusted_units * highest_rate, 2)
+        if in_dsm_window(timestamp):
+            if adjusted_units < units_before:
+                adj_cost = round(adjusted_units * battery_charge_rate, 2)
+                # this means that unit will be deducted from battery
+                cycle = "USE"
+                upsert_battery_status(timestamp, adjusted_units, cycle)
+                units_before = units_before - adjusted_units
+            else:
+                # if enough units not available for deduction from battery
+                balance_units = adjusted_units - units_before
+                cycle = "USE"
+                upsert_battery_status(timestamp, balance_units, cycle)
+                adj_cost = units_before * battery_charge_rate + balance_units * highest_rate
 
-    return {
-        "adjustment_charges": adj_cost,
-        "battery_used": round(battery_used, 3),
-        "balance_units": round(balance_units, 3),
-        "units_available_after": round(units_before, 3),
-        "highest_rate": highest_rate,
-        "battery_charge_rate": 4.0
-    }
+        else:
+            adj_cost = round(adjusted_units * highest_rate, 2)
+
+        return {
+            "adjustment_charges": adj_cost,
+            "battery_used": round(battery_used, 3),
+            "balance_units": round(balance_units, 3),
+            "units_available_after": round(units_before, 3),
+            "highest_rate": highest_rate,
+            "battery_charge_rate": 4.0
+        }
 
 
 @consolidatedAPI.route('/calculate', methods=['GET'])
@@ -347,5 +348,6 @@ def calculate_consolidated():
         # Battery snapshot
         "battery_units_before": units_left_to_charge,
         "battery_units_after_banking": bank["units_available_after"],
+        "banked_charge": units_left_to_charge - bank["units_available_after"],
         "battery_units_after_adjustment": adj["units_available_after"]
     }), 200
