@@ -183,6 +183,7 @@ def decide_banking(timestamp, banked_units, scheduled_generation, drawl, weighte
                     cycle = "CHARGE"
                     banking_cost = 0.0
                     # added the banked unit to charge the battery
+                    units_after = units_available_before - banked_units
                     upsert_battery_status(timestamp, banked_units, cycle)
                 else:
                     # dsm all banked units
@@ -239,7 +240,6 @@ def compute_adjustment(timestamp, adjusted_units, mod, dam, rtm,
     balance_units = 0.0
     adj_cost = 0.0
 
-    print(adjusted_units,units_before)
     # If there is no Adjusted Units
     if adjusted_units <= 0:
         return {
@@ -264,9 +264,12 @@ def compute_adjustment(timestamp, adjusted_units, mod, dam, rtm,
                 cycle = "USE"
                 upsert_battery_status(timestamp, balance_units, cycle)
                 adj_cost = units_before * battery_charge_rate + balance_units * highest_rate
+                units_before = 2823529.412  # Battery Units Available
 
         else:
             adj_cost = round(adjusted_units * highest_rate, 2)
+            cycle = "NO_CHARGE"
+            upsert_battery_status(timestamp, adjusted_units, cycle)
 
         return {
             "adjustment_charges": adj_cost,
@@ -281,6 +284,7 @@ def compute_adjustment(timestamp, adjusted_units, mod, dam, rtm,
 @consolidatedAPI.route('/calculate', methods=['GET'])
 def calculate_consolidated():
     raw = request.args.get('start_date')
+
     try:
         timestamp = parse_start_timestamp(raw)
     except ValueError as e:
@@ -348,6 +352,6 @@ def calculate_consolidated():
         # Battery snapshot
         "battery_units_before": units_left_to_charge,
         "battery_units_after_banking": bank["units_available_after"],
-        "banked_charge": units_left_to_charge - bank["units_available_after"],
+        "battery_charged_units": units_left_to_charge - bank["units_available_after"],
         "battery_units_after_adjustment": adj["units_available_after"]
     }), 200
