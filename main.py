@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 
+from routes.routes_auth import router as auth_router
 from routes.adjustment import router as adjustment_router
 from routes.availability import router as availability_router
 from routes.backdown import router as backdown_router
@@ -40,6 +41,7 @@ mongo_client = AsyncIOMotorClient(mongo_uri)
 app.state.mongo_db = mongo_client["powercasting"]
 
 # Register Routers
+app.include_router(auth_router, prefix="/auth", tags=["Auth"])
 app.include_router(adjustment_router, prefix="/adjusting", tags=["Adjustment"])
 app.include_router(availability_router, prefix="/availability", tags=["Availability"])
 app.include_router(backdown_router, prefix="/backdown", tags=["Backdown"])

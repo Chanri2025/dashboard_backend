@@ -1,5 +1,3 @@
-# ✅ FastAPI version of the procurementAPI blueprint (FULL VERSION)
-
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
@@ -15,14 +13,6 @@ from utils.date_utils import parse_timestamp_any, parse_start_timestamp
 router = APIRouter()
 
 load_dotenv()
-
-# --- DB Setup ---
-db_config = {
-    'user': os.getenv('DB_USER'),
-    'password': os.getenv('DB_PASSWORD'),
-    'host': os.getenv('DB_HOST'),
-    'database': os.getenv('DB_NAMES').split(',')[1],
-}
 
 mongo_uri = os.getenv("MONGO_URI")
 client = MongoClient(mongo_uri)
