@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="6d3c20e0-234c-4e23-add2-70a4ac09e0c0" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dashboard_backend.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dashboard_backend.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dataSources.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/material_theme_project_new.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/material_theme_project_new.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/sqldialects.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Helpers/helpers.py" beforeDir="false" afterPath="$PROJECT_DIR$/Helpers/helpers.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Routes/AdjustmentRoutes.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Routes/BackdownRoutes.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Routes/BankingRoutes.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Routes/availibilityfactorRoutes.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Routes/consolidatedRoutes.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Routes/consumerRoutes.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Routes/demandRoutes.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Routes/divisionRoutes.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Routes/dtrRoutes.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Routes/feederRoutes.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Routes/iexRoutes.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Routes/plantRoutes.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Routes/powerTheftRoutes.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Routes/procurementRoutes.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Routes/regionRoutes.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Routes/substationRoutes.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "lastFilter": {
+    "state": "OPEN",
+    "assignee": "Chanri2025"
+  }
+}]]></component>
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "https://github.com/DMMPrice/dashboard_backend.git",
+    "accountId": "a7abc5c5-656d-4a65-b827-a1150280a13b"
+  }
+}]]></component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "customColor": "",
+  "associatedIndex": 5
+}]]></component>
+  <component name="ProjectId" id="30zp0tgH8a9Hrzzir1FsfU32thq" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "dart.analysis.tool.window.visible": "false",
+    "git-widget-placeholder": "aniruddha",
+    "settings.editor.selected.configurable": "vcs.Git"
+  }
+}]]></component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-python-sdk-fc1d50d2d915-aa17d162503b-com.jetbrains.pycharm.community.sharedIndexes.bundled-PC-243.24978.54" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="6d3c20e0-234c-4e23-add2-70a4ac09e0c0" name="Changes" comment="" />
+      <created>1754640038520</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1754640038520</updated>
+    </task>
+    <servers />
+  </component>
+</project>

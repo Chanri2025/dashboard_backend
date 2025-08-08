@@ -1,14 +1,15 @@
-from flask import Blueprint, jsonify, request, abort
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import JSONResponse
 from pymongo import MongoClient
+from datetime import time
 from dotenv import load_dotenv
 import os, math
-from datetime import time
 from Helpers.helpers import parse_start_timestamp
 
-consolidatedAPI = Blueprint('consolidated', __name__)
+router = APIRouter()
 load_dotenv()
 
-mongo_uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017')
+mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 client = MongoClient(mongo_uri)
 power_db = client["power_casting_new"]
 
@@ -281,48 +282,42 @@ def compute_adjustment(timestamp, adjusted_units, mod, dam, rtm,
         }
 
 
-@consolidatedAPI.route('/calculate', methods=['GET'])
-def calculate_consolidated():
-    raw = request.args.get('start_date')
-
+# --- FastAPI route ---
+@router.get("/calculate")
+async def calculate_consolidated(start_date: str = Query(..., alias="start_date")):
     try:
-        timestamp = parse_start_timestamp(raw)
+        timestamp = parse_start_timestamp(start_date)
     except ValueError as e:
-        return abort(400, description=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
 
     try:
-        # Getting banked unit and adjusted units
         banked_units, adjusted_units = fetch_banking_row(timestamp)
-        # Getting plants data
         plants, plants_by_vc = fetch_plants(timestamp)
-        # Getting SG and Drawl
         scheduled_generation, drawl = fetch_demand_drawl(timestamp)
-        # Getting DAM, RTM, Market Purchase
         dam, rtm, market_purchase = fetch_market_prices(timestamp)
-        # Getting the Battery Details
         battery_details = fetch_battery_status(timestamp)
     except LookupError as e:
-        return abort(404, description=str(e))
+        raise HTTPException(status_code=404, detail=str(e))
 
-    # weighted_average, total_backdown_cost, total_backdown_units, updated_plants = calculate_weighted_average_for_quantum(plants_by_vc, banked_units)
     total_backdown_units, total_backdown_cost, weighted_average, mod = compute_totals(plants, plants_by_vc)
     units_left_to_charge = float(battery_details.get("Units_Available", 0.0) or 0.0)
 
-    # 1) Banking (may change battery)
+    # 1. Banking
     bank = decide_banking(
-        timestamp, banked_units, scheduled_generation, drawl, weighted_average, mod, dam, rtm, market_purchase,
-        total_backdown_units, total_backdown_cost, units_left_to_charge, plants_by_vc
+        timestamp, banked_units, scheduled_generation, drawl,
+        weighted_average, mod, dam, rtm, market_purchase,
+        total_backdown_units, total_backdown_cost,
+        units_left_to_charge, plants_by_vc
     )
 
-    # 2) Adjustment (uses post-banking battery)
+    # 2. Adjustment
     adj = compute_adjustment(
         timestamp, adjusted_units, mod, dam, rtm,
     )
 
-    return jsonify({
+    result = {
         "Timestamp": timestamp.strftime("%Y-%m-%d %H:%M"),
 
-        # Inputs
         "banked_units": round(banked_units, 3),
         "adjusted_units": round(adjusted_units, 3),
         "schedule_generation": round(scheduled_generation, 3),
@@ -330,7 +325,6 @@ def calculate_consolidated():
         "dam_rate": round(dam, 2),
         "rtm_rate": round(rtm, 2),
 
-        # Plant & totals
         "plant_backdown_data": plants,
         "total_backdown_units": round(total_backdown_units, 3),
         "total_backdown_cost": round(total_backdown_cost, 2),
@@ -338,20 +332,19 @@ def calculate_consolidated():
         "MOD_rate": mod,
         "highest_rate": max(mod, dam, rtm),
 
-        # Banking result
         "banking_cost": bank["banking_cost"],
         "DSM": bank["DSM_units"],
         "banking_cycle": bank["cycle"],
 
-        # Adjustment result
         "adjustment_charges": adj["adjustment_charges"],
         "battery_units_used_for_adjustment": adj["battery_used"],
         "market_purchase": adj["balance_units"] + bank["market_purchase"],
         "battery_charge_rate": adj["battery_charge_rate"],
 
-        # Battery snapshot
         "battery_units_before": units_left_to_charge,
         "battery_units_after_banking": bank["units_available_after"],
         "battery_charged_units": units_left_to_charge - bank["units_available_after"],
         "battery_units_after_adjustment": adj["units_available_after"]
-    }), 200
+    }
+
+    return JSONResponse(content=result)
