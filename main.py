@@ -64,3 +64,8 @@ app.include_router(substation_router, prefix="/substation", tags=["Sub - Station
 @app.get("/")
 async def root():
     return {"message": "GUVNL is running!"}
+
+if __name__ == "__main__":
+    import uvicorn
+    # reload and workers>1 are incompatible; pick ONE
+    uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)

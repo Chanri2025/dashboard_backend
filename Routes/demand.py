@@ -80,7 +80,7 @@ def get_dashboard_data(start: Optional[str] = Query(None), end: Optional[str] = 
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/range")
+@router.get("/data")
 def get_demand_data(start_date: str = Query(...), end_date: str = Query(...)):
     try:
         start_dt = parse_start_timestamp(start_date)

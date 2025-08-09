@@ -1,8 +1,8 @@
-# auth/schemas.py
 from pydantic import BaseModel, EmailStr, constr
 from typing import Literal, List
 
-PublicRole = Literal["User", "Guest"]  # allowed at self-registration
+# Allowed roles a client can request themselves during signup
+PublicRole = Literal["User", "Guest"]
 
 
 class RegisterIn(BaseModel):
@@ -15,7 +15,8 @@ class RegisterIn(BaseModel):
 
 class AssignRolesIn(BaseModel):
     user_id: int
-    roles: List[Literal["SuperAdmin", "Admin", "User", "Guest"]]
+    # Admin endpoint can accept any of these labels (we normalize in the route)
+    roles: List[Literal["SuperAdmin", "Admin", "User", "Guest", "SUPER-ADMIN", "ADMIN", "USER", "GUEST"]]
 
 
 class LoginIn(BaseModel):
@@ -35,11 +36,16 @@ class UserOut(BaseModel):
         from_attributes = True
 
 
+# User payload with a single display role
+class UserWithRole(UserOut):
+    role: str | None = None  # "SUPER-ADMIN" | "ADMIN" | None
+
+
 class TokenOut(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
-    user: UserOut
+    user: UserWithRole
 
 
 class UpdatePhotoIn(BaseModel):

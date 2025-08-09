@@ -1,8 +1,9 @@
-# routes/routes_auth.py
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, Body
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from auth.schemas import (
-    RegisterIn, LoginIn, TokenOut, UserOut, UpdatePhotoIn, ChangePasswordIn, AssignRolesIn
+    RegisterIn, LoginIn, TokenOut, UserOut, UserWithRole,
+    UpdatePhotoIn, ChangePasswordIn, AssignRolesIn
 )
 from auth.models import User, Role, RefreshToken, AuthAudit
 from auth.security import (
@@ -13,10 +14,10 @@ from auth.deps import get_current_user, require_roles
 from db_sql import get_db
 import datetime as dt, hashlib
 
-router = APIRouter()
+router = APIRouter()  # keep as-is (your main.py includes the router)
 
 
-# helper
+# ───────────────── Helpers ─────────────────
 def log_auth_event(db: Session, request: Request | None, user_id: int | None, event: str, details: str = ""):
     db.add(AuthAudit(
         user_id=user_id,
@@ -26,6 +27,31 @@ def log_auth_event(db: Session, request: Request | None, user_id: int | None, ev
         user_agent=(request.headers.get("user-agent") if request else None),
     ))
     db.commit()
+
+
+def pick_admin_role(role_names: list[str]) -> str | None:
+    # normalize: lower + replace "_" with "-" so "SUPER_ADMIN" matches
+    def norm(s: str) -> str:
+        return s.strip().lower().replace("_", "-")
+
+    names = {norm(r) for r in role_names}
+    if "super-admin" in names or "superadmin" in names:
+        return "SUPER-ADMIN"
+    if "admin" in names:
+        return "ADMIN"
+    return None
+
+
+def user_with_role_payload(user: User, role_names: list[str]) -> dict:
+    return {
+        "user_id": user.user_id,
+        "email": user.email,
+        "full_name": user.full_name,
+        "profile_photo": user.profile_photo,
+        "is_active": user.is_active,
+        "email_verified": user.email_verified,
+        "role": pick_admin_role(role_names),
+    }
 
 
 # ───────── Register ─────────
@@ -45,8 +71,9 @@ def register(body: RegisterIn, request: Request, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
-    role_name = body.role or "User"
-    role = db.query(Role).filter_by(name=role_name).first()
+    # Only "User" or "Guest" allowed at signup; match case-insensitively in DB
+    role_name = (body.role or "User")
+    role = db.query(Role).filter(func.lower(Role.name) == role_name.lower()).first()
     if role:
         user.roles.append(role)
         db.commit()
@@ -76,7 +103,11 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
     db.commit()
 
     log_auth_event(db, request, user.user_id, "LOGIN_SUCCESS", f"Roles={roles}")
-    return {"access_token": access, "refresh_token": raw_refresh, "user": user}
+    return {
+        "access_token": access,
+        "refresh_token": raw_refresh,
+        "user": user_with_role_payload(user, roles),
+    }
 
 
 # ───────── Refresh ─────────
@@ -100,7 +131,7 @@ def refresh(
     roles = [r.name for r in user.roles]
     access = create_access_token(sub=str(user.user_id), roles=roles)
 
-    # rotate
+    # rotate refresh
     rt.revoked = True
     new_raw, new_digest = make_refresh_token()
     db.add(RefreshToken(
@@ -111,7 +142,11 @@ def refresh(
     db.commit()
 
     log_auth_event(db, request, user.user_id, "REFRESH_SUCCESS", "")
-    return {"access_token": access, "refresh_token": new_raw, "user": user}
+    return {
+        "access_token": access,
+        "refresh_token": new_raw,
+        "user": user_with_role_payload(user, roles),
+    }
 
 
 # ───────── Logout ─────────
@@ -142,7 +177,7 @@ def me(current: User = Depends(get_current_user)):
 @router.post("/profile-photo", response_model=UserOut)
 def update_photo(payload: UpdatePhotoIn, request: Request, current: User = Depends(get_current_user),
                  db: Session = Depends(get_db)):
-    current.profile_photo = payload.profile_photo
+    current.profile_photo = payload.profile_photo  # base64
     db.commit()
     db.refresh(current)
     log_auth_event(db, request, current.user_id, "PROFILE_PHOTO_UPDATE", "")
@@ -162,16 +197,19 @@ def change_password(payload: ChangePasswordIn, request: Request, current: User =
     return Response(status_code=204)
 
 
-# ───────── Assign Roles ─────────
+# ───────── Assign Roles (Admin/SuperAdmin) ─────────
 @router.post("/admin/assign-roles", dependencies=[Depends(require_roles("SuperAdmin", "Admin"))])
 def assign_roles(payload: AssignRolesIn, request: Request, db: Session = Depends(get_db)):
     user = db.get(User, payload.user_id)
     if not user:
         raise HTTPException(404, "User not found")
 
-    role_objs = db.query(Role).filter(Role.name.in_(payload.roles)).all()
-    existing = {r.name for r in role_objs}
-    missing = [r for r in payload.roles if r not in existing]
+    # Normalize input role labels to lowercase for matching
+    wanted = {r.strip().lower() for r in payload.roles}
+    role_objs = db.query(Role).filter(func.lower(Role.name).in_(wanted)).all()
+
+    existing = {r.name.lower() for r in role_objs}
+    missing = [r for r in wanted if r not in existing]
     if missing:
         raise HTTPException(400, f"Unknown roles: {missing}")
 
