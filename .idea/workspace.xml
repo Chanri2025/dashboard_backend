@@ -4,12 +4,14 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="6d3c20e0-234c-4e23-add2-70a4ac09e0c0" name="Changes" comment="Auth Part Added - I">
+    <list default="true" id="6d3c20e0-234c-4e23-add2-70a4ac09e0c0" name="Changes" comment="Auth Part Added - II">
+      <change afterPath="$PROJECT_DIR$/utils/mongo_index.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/dashboard_backend.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dashboard_backend.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Routes/demand.py" beforeDir="false" afterPath="$PROJECT_DIR$/Routes/demand.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Routes/routes_auth.py" beforeDir="false" afterPath="$PROJECT_DIR$/Routes/routes_auth.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/auth/schemas.py" beforeDir="false" afterPath="$PROJECT_DIR$/auth/schemas.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Routes/procurement.py" beforeDir="false" afterPath="$PROJECT_DIR$/Routes/procurement.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -54,6 +56,7 @@
     "RunOnceActivity.git.unshallow": "true",
     "dart.analysis.tool.window.visible": "false",
     "git-widget-placeholder": "aniruddha",
+    "last_opened_file_path": "C:/Users/hp/Desktop/Code/Tools",
     "settings.editor.selected.configurable": "vcs.Git"
   }
 }]]></component>
@@ -131,13 +134,22 @@
       <option name="project" value="LOCAL" />
       <updated>1754655712849</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Auth Part Added - II">
+      <option name="closed" value="true" />
+      <created>1754742688181</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1754742688181</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Version 2.0 Converted to Fast API" />
     <MESSAGE value="Version 2.0 Converted to Fast API - II" />
     <MESSAGE value="Auth Part Added - I" />
-    <option name="LAST_COMMIT_MESSAGE" value="Auth Part Added - I" />
+    <MESSAGE value="Auth Part Added - II" />
+    <option name="LAST_COMMIT_MESSAGE" value="Auth Part Added - II" />
   </component>
 </project>

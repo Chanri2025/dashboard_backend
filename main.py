@@ -1,10 +1,17 @@
 # main.py
 import os
-from fastapi import FastAPI, Request
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 
+from pymongo import MongoClient, ASCENDING
+from motor.motor_asyncio import AsyncIOMotorClient
+
+from utils.mongo_index import ensure_index
+
+# ── Routers
 from routes.routes_auth import router as auth_router
 from routes.adjustment import router as adjustment_router
 from routes.availability import router as availability_router
@@ -24,21 +31,49 @@ from routes.substation import router as substation_router
 
 load_dotenv()
 
-app = FastAPI(title="Power Casting API", debug=True)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    mongo_uri = os.getenv("MONGO_URI")
+
+    # Async client (if some routes use Motor)
+    am_client = AsyncIOMotorClient(mongo_uri)
+    app.state.mongo_db = am_client["powercasting"]
+
+    # Sync client (for indexes & PyMongo routes)
+    sm_client = MongoClient(mongo_uri)
+    app.state.mongo_sync = sm_client
+    mdb = sm_client["powercasting"]
+
+    # Build indexes once, idempotently
+    drop_mismatch = os.getenv("ALLOW_INDEX_DROP", "false").lower() == "true"
+    ensure_index(mdb["Demand"], [("TimeStamp", ASCENDING)], name="ts", unique=False, drop_if_mismatch=drop_mismatch)
+    ensure_index(mdb["Banking_Data"], [("TimeStamp", ASCENDING)], name="ts", unique=False,
+                 drop_if_mismatch=drop_mismatch)
+    ensure_index(mdb["IEX_Generation"], [("TimeStamp", ASCENDING)], name="ts", unique=False,
+                 drop_if_mismatch=drop_mismatch)
+    ensure_index(mdb["mustrunplantconsumption"], [("TimeStamp", ASCENDING), ("Plant_Name", ASCENDING)],
+                 name="ts_plant", unique=False, drop_if_mismatch=drop_mismatch)
+    ensure_index(mdb["Demand_Output"], [("TimeStamp", ASCENDING)], name="ts", unique=True,
+                 drop_if_mismatch=drop_mismatch)
+
+    try:
+        yield
+    finally:
+        am_client.close()
+        sm_client.close()
+
+
+app = FastAPI(title="Power Casting API", debug=True, lifespan=lifespan)
 
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
-    allow_credentials=True,
+    allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
+    allow_credentials=os.getenv("CORS_CREDENTIALS", "false").lower() == "true",
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Mongo connection
-mongo_uri = os.getenv("MONGO_URI")
-mongo_client = AsyncIOMotorClient(mongo_uri)
-app.state.mongo_db = mongo_client["powercasting"]
 
 # Register Routers
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
@@ -46,9 +81,7 @@ app.include_router(adjustment_router, prefix="/adjusting", tags=["Adjustment"])
 app.include_router(availability_router, prefix="/availability", tags=["Availability"])
 app.include_router(backdown_router, prefix="/backdown", tags=["Backdown"])
 app.include_router(banking_router, prefix="/banking", tags=["Banking"])
-app.include_router(
-    consolidated_router, prefix="/consolidated-part", tags=["Consolidated"]
-)
+app.include_router(consolidated_router, prefix="/consolidated-part", tags=["Consolidated"])
 app.include_router(consumer_router, prefix="/consumer", tags=["Consumer"])
 app.include_router(demand_router, prefix="/demand", tags=["Demand"])
 app.include_router(dtr_router, prefix="/dtr", tags=["DTR"])
@@ -65,7 +98,9 @@ app.include_router(substation_router, prefix="/substation", tags=["Sub - Station
 async def root():
     return {"message": "GUVNL is running!"}
 
+
 if __name__ == "__main__":
     import uvicorn
+
     # reload and workers>1 are incompatible; pick ONE
     uvicorn.run("main:app", host="0.0.0.0", port=8080, reload=True)
