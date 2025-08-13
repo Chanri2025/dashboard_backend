@@ -251,6 +251,7 @@ def compute_adjustment(timestamp, adjusted_units, mod, dam, rtm,
 
     if units_before > 0:
         battery_units = battery_units - units_before
+
     # If there is no Adjusted Units
     if adjusted_units <= 0:
         return {
@@ -354,6 +355,7 @@ async def calculate_consolidated(start_date: str = Query(..., alias="start_date"
         "battery_units_before_banking": units_left_to_charge,
         "battery_units_available_after_banking": bank["units_available_after"],
         "units_used_to_charge": units_left_to_charge - bank["units_available_after"],
+        "units_used_to_adjust": adj["units_available_after"] - bank["units_available_after"],
         "battery_units_after_adjustment": adj["units_available_after"]
     }
 
