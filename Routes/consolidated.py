@@ -134,8 +134,6 @@ def upsert_battery_status(ts, qty, cycle, *, capacity_limit=None):
         headroom = max(headroom - qty, 0.0)
     elif cycle == "USE":
         headroom = headroom + qty
-        if capacity_limit is not None:
-            headroom = min(headroom, capacity_limit)
     else:
         # NO_CHARGE or anything else -> no change
         pass
@@ -169,6 +167,7 @@ def decide_banking(timestamp, banked_units, scheduled_generation, drawl, weighte
     cycle = "NO_CHARGE"
 
     if banked_units <= 0:
+        upsert_battery_status(timestamp, 0, cycle)
         return {
             "banking_cost": 0.0,
             "DSM_units": 0.0,
@@ -183,9 +182,17 @@ def decide_banking(timestamp, banked_units, scheduled_generation, drawl, weighte
                 if not in_dsm_window(timestamp):
                     cycle = "CHARGE"
                     banking_cost = 0.0
-                    # added the banked unit to charge the battery
-                    units_after = units_available_before - banked_units
-                    upsert_battery_status(timestamp, banked_units, cycle)
+                    if units_after == 0:  # added the banked unit will go to DSM
+                        dsm_units = banked_units
+                        upsert_battery_status(timestamp, 0, cycle)
+                    elif units_available_before > banked_units:  # added the banked unit will go to battery
+                        dsm_units = 0
+                        upsert_battery_status(timestamp, banked_units, cycle)
+                        units_after = units_available_before - banked_units
+                    else:
+                        dsm_units = banked_units - units_available_before  # partial DSM Discharge
+                        upsert_battery_status(timestamp, units_available_before, cycle)
+                        units_after = 0
                 else:
                     # dsm all banked units
                     dsm_units = banked_units
@@ -239,8 +246,11 @@ def compute_adjustment(timestamp, adjusted_units, mod, dam, rtm,
     units_before = float(battery_status.get("Units_Available", 0.0) or 0.0)
     battery_used = 0.0
     balance_units = 0.0
+    battery_units = 2823529.412
     adj_cost = 0.0
 
+    if units_before > 0:
+        battery_units = battery_units - units_before
     # If there is no Adjusted Units
     if adjusted_units <= 0:
         return {
@@ -253,19 +263,19 @@ def compute_adjustment(timestamp, adjusted_units, mod, dam, rtm,
         }
     else:
         if in_dsm_window(timestamp):
-            if adjusted_units < units_before:
+            if adjusted_units < battery_units:
                 adj_cost = round(adjusted_units * battery_charge_rate, 2)
                 # this means that unit will be deducted from battery
                 cycle = "USE"
                 upsert_battery_status(timestamp, adjusted_units, cycle)
-                units_before = units_before - adjusted_units
+                units_before = adjusted_units + units_before
             else:
                 # if enough units not available for deduction from battery
-                balance_units = adjusted_units - units_before
+                balance_units = adjusted_units - battery_units
                 cycle = "USE"
-                upsert_battery_status(timestamp, balance_units, cycle)
-                adj_cost = units_before * battery_charge_rate + balance_units * highest_rate
-                units_before = 2823529.412  # Battery Units Available
+                upsert_battery_status(timestamp, battery_units, cycle)
+                adj_cost = battery_units * battery_charge_rate + balance_units * highest_rate
+                units_before = battery_units + units_before  # Battery Units Available
 
         else:
             adj_cost = round(adjusted_units * highest_rate, 2)
@@ -341,9 +351,9 @@ async def calculate_consolidated(start_date: str = Query(..., alias="start_date"
         "market_purchase": adj["balance_units"] + bank["market_purchase"],
         "battery_charge_rate": adj["battery_charge_rate"],
 
-        "battery_units_before": units_left_to_charge,
-        "battery_units_after_banking": bank["units_available_after"],
-        "battery_charged_units": units_left_to_charge - bank["units_available_after"],
+        "battery_units_before_banking": units_left_to_charge,
+        "battery_units_available_after_banking": bank["units_available_after"],
+        "units_used_to_charge": units_left_to_charge - bank["units_available_after"],
         "battery_units_after_adjustment": adj["units_available_after"]
     }
 
