@@ -4,10 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="6d3c20e0-234c-4e23-add2-70a4ac09e0c0" name="Changes" comment="Auth Part Added - III">
+    <list default="true" id="6d3c20e0-234c-4e23-add2-70a4ac09e0c0" name="Changes" comment="Auth Part Added - IV">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Routes/consolidated.py" beforeDir="false" afterPath="$PROJECT_DIR$/Routes/consolidated.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Routes/procurement.py" beforeDir="false" afterPath="$PROJECT_DIR$/Routes/procurement.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -146,7 +144,15 @@
       <option name="project" value="LOCAL" />
       <updated>1754989625229</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="Auth Part Added - IV">
+      <option name="closed" value="true" />
+      <created>1755072281948</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1755072281948</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
@@ -155,6 +161,7 @@
     <MESSAGE value="Auth Part Added - I" />
     <MESSAGE value="Auth Part Added - II" />
     <MESSAGE value="Auth Part Added - III" />
-    <option name="LAST_COMMIT_MESSAGE" value="Auth Part Added - III" />
+    <MESSAGE value="Auth Part Added - IV" />
+    <option name="LAST_COMMIT_MESSAGE" value="Auth Part Added - IV" />
   </component>
 </project>
