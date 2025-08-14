@@ -3,7 +3,6 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/dashboard_backend.iml" filepath="$PROJECT_DIR$/.idea/dashboard_backend.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../dashboard_prediction/.idea/dashboard_prediction.iml" filepath="$PROJECT_DIR$/../dashboard_prediction/.idea/dashboard_prediction.iml" />
     </modules>
   </component>
 </project>
