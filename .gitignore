@@ -1,4 +1,4 @@
-Routes/__pycache__/
+routes/__pycache__/
 __pycache__/
 start_gunicorn.sh
 .venv
