@@ -88,7 +88,7 @@ def _load_backdown_table() -> List[Dict[str, float]]:
     conn = mysql_pool.get_connection()
     try:
         cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT Start_Load, End_Load, SHR, Aux_Consumption FROM Back_Down_Table")
+        cur.execute("SELECT Start_Load, End_Load, SHR, Aux_Consumption FROM back_down_table")
         rows = cur.fetchall()
         return [
             {"lower": r["Start_Load"], "upper": r["End_Load"], "SHR": r["SHR"], "Aux_Consumption": r["Aux_Consumption"]}
