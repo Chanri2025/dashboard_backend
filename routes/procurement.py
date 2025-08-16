@@ -72,7 +72,7 @@ def _load_other_plants(month_col: str) -> List[Dict[str, Any]]:
                    pd.Technical_Minimum, pd.Aux_Consumption, pd.Variable_Cost,
                    pd.Max_Power, pd.Min_Power
             FROM plant_details pd
-            JOIN PAF_Details pfd ON pd.Code=pfd.Code
+            JOIN paf_details pfd ON pd.Code=pfd.Code
             WHERE pd.Type='Other' AND pfd.`{month_col}`='Y'
             ORDER BY pd.Variable_Cost ASC
         """)
