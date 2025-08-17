@@ -5,7 +5,7 @@
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/venv1" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.12 virtualenv at ~/Desktop/GUVNL/Main App Codes/dashboard_backend/venv" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.13 (dashboard_backend)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PyDocumentationSettings">
