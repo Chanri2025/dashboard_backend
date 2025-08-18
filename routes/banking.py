@@ -13,7 +13,7 @@ router = APIRouter()
 load_dotenv()
 
 # MongoDB connection
-mongo_uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017')
+mongo_uri = os.getenv('MONGO_URI')
 client = MongoClient(mongo_uri)
 power_db = client["power_casting_new"]
 

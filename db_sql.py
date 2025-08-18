@@ -4,9 +4,9 @@ from urllib.parse import quote_plus
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-DB_HOST = os.getenv("DB_HOST", "127.0.0.1").strip()
+DB_HOST = os.getenv("DB_HOST", "147.93.106.173").strip()
 DB_PORT = os.getenv("DB_PORT", "3306").strip()
-DB_USER = os.getenv("DB_USER", "root").strip()
+DB_USER = os.getenv("DB_USER", "DMMPrice").strip()
 DB_PASSWORD = os.getenv("DB_PASSWORD","Babai@6157201")  # do not default to empty
 DB_NAMES = os.getenv("DB_NAMES", "guvnl_consumers,guvnl_dev")
 AUTH_DB = DB_NAMES.split(",")[-1].strip()
