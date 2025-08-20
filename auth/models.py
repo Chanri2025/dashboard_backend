@@ -1,4 +1,3 @@
-# auth/models.py
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy import (
     Column, BigInteger, Integer, String, Boolean, DateTime, ForeignKey, func
@@ -24,7 +23,7 @@ class User(Base):
 class Role(Base):
     __tablename__ = "roles"
     role_id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(50), unique=True, nullable=False)
+    name = Column(String(50), unique=True, nullable=False)  # store uppercase by convention
     users = relationship("User", secondary="user_roles", back_populates="roles")
 
 
@@ -44,9 +43,11 @@ class RefreshToken(Base):
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     user_agent = Column(String(255))
     ip = Column(String(45))
+    # optional convenience:
+    user = relationship("User", backref="refresh_tokens")
 
 
-# NEW: auth audit model
+# Optional audit (keep if you plan to log events)
 class AuthAudit(Base):
     __tablename__ = "auth_audit"
     id = Column(BigInteger, primary_key=True, autoincrement=True)

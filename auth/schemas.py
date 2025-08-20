@@ -1,22 +1,64 @@
-from pydantic import BaseModel, EmailStr, constr
-from typing import Literal, List
+from pydantic import BaseModel, EmailStr, constr, field_validator, ConfigDict
+from typing import List
 
-# Allowed roles a client can request themselves during signup
-PublicRole = Literal["User", "Guest"]
+# Allowed roles
+ALLOWED_PUBLIC_ROLES = {"USER", "GUEST"}
+ALLOWED_ALL_ROLES = {"SUPER-ADMIN", "ADMIN", "USER", "GUEST"}
 
 
+def _normalize_role_label(v: str | None) -> str | None:
+    if v is None:
+        return None
+    v = v.strip()
+    if not v:
+        return None
+    v = v.replace(" ", "-").replace("_", "-").upper()
+    if v in {"SUPERADMIN", "SUPER-ADMIN", "SUPER_ADMIN"}:
+        v = "SUPER-ADMIN"
+    return v
+
+
+# ---------- Requests ----------
 class RegisterIn(BaseModel):
     email: EmailStr
     password: constr(min_length=8)
     full_name: constr(min_length=2, max_length=120)
     profile_photo: str | None = None
-    role: PublicRole | None = None  # optional: "User" or "Guest"
+    role: str | None = None  # public may request USER/GUEST
+
+    @field_validator("role")
+    @classmethod
+    def normalize_public_role(cls, v: str | None) -> str | None:
+        v = _normalize_role_label(v)
+        if v is None:
+            return v
+        if v not in ALLOWED_PUBLIC_ROLES:
+            raise ValueError(f"role must be one of {sorted(ALLOWED_PUBLIC_ROLES)}")
+        return v
 
 
 class AssignRolesIn(BaseModel):
     user_id: int
-    # Admin endpoint can accept any of these labels (we normalize in the route)
-    roles: List[Literal["SuperAdmin", "Admin", "User", "Guest", "SUPER-ADMIN", "ADMIN", "USER", "GUEST"]]
+    roles: List[str]
+
+    @field_validator("roles")
+    @classmethod
+    def normalize_and_validate_roles(cls, roles: List[str]) -> List[str]:
+        if not roles:
+            return roles
+        norm: List[str] = []
+        for r in roles:
+            nr = _normalize_role_label(r)
+            if nr is None or nr not in ALLOWED_ALL_ROLES:
+                raise ValueError(f"invalid role: {r!r}. Allowed: {sorted(ALLOWED_ALL_ROLES)}")
+            norm.append(nr)
+        # de-dup preserve order
+        out, seen = [], set()
+        for r in norm:
+            if r not in seen:
+                seen.add(r)
+                out.append(r)
+        return out
 
 
 class LoginIn(BaseModel):
@@ -24,7 +66,9 @@ class LoginIn(BaseModel):
     password: str
 
 
+# ---------- Responses ----------
 class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     user_id: int
     email: EmailStr
     full_name: str
@@ -32,13 +76,11 @@ class UserOut(BaseModel):
     is_active: bool
     email_verified: bool
 
-    class Config:
-        from_attributes = True
 
-
-# User payload with a single display role
 class UserWithRole(UserOut):
-    role: str | None = None  # "SUPER-ADMIN" | "ADMIN" | None
+    model_config = ConfigDict(from_attributes=True)
+    role: str | None = None  # primary display role
+    roles: List[str] | None = None  # full list if you need it
 
 
 class TokenOut(BaseModel):
