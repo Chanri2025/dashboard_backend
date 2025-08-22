@@ -3,7 +3,18 @@ from typing import List
 
 # Allowed roles
 ALLOWED_PUBLIC_ROLES = {"USER", "GUEST"}
-ALLOWED_ALL_ROLES = {"SUPER-ADMIN", "ADMIN", "USER", "GUEST"}
+ALLOWED_ALL_ROLES = {
+    "SUPER-ADMIN",
+    "ADMIN",
+    "USER",
+    "GUEST",
+    "ADMIN-PROCUREMENT",
+    "MANAGER-PROCUREMENT",
+    "EMPLOYEE-PROCUREMENT",
+    "ADMIN-DISTRIBUTION",
+    "MANAGER-DISTRIBUTION",
+    "EMPLOYEE-DISTRIBUTION",
+}
 
 
 def _normalize_role_label(v: str | None) -> str | None:
