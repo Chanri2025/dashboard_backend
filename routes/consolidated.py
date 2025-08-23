@@ -21,7 +21,7 @@ def calculate_weighted_average_for_quantum(plants, quantum):
     total_units = 0.0
     updated_plants = []
 
-    for plant in sorted(plants, key=lambda x: x['VC'], reverse=True):
+    for plant in sorted(plants, key=lambda x: x['VC'], reverse=False):
         available = plant.get('backdown_units', 0.0)
         vc = plant.get('VC', 0.0)
 
