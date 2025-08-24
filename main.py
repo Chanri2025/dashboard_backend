@@ -17,10 +17,8 @@ from utils.mongo_helpers import convert_decimal128
 
 # ── Routers
 from routes.routes_auth import router as auth_router
-from routes.adjustment import router as adjustment_router
 from routes.availability import router as availability_router
 from routes.backdown import router as backdown_router
-from routes.banking import router as banking_router
 from routes.consolidated import router as consolidated_router
 from routes.consumer import router as consumer_router
 from routes.demand import router as demand_router
@@ -108,10 +106,8 @@ app.add_middleware(
 
 # Register Routers
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])
-app.include_router(adjustment_router, prefix="/adjusting", tags=["Adjustment"])
 app.include_router(availability_router, prefix="/availability", tags=["Availability"])
 app.include_router(backdown_router, prefix="/backdown", tags=["Backdown"])
-app.include_router(banking_router, prefix="/banking", tags=["Banking"])
 app.include_router(consolidated_router, prefix="/consolidated-part", tags=["Consolidated"])
 app.include_router(consumer_router, prefix="/consumer", tags=["Consumer"])
 app.include_router(demand_router, prefix="/demand", tags=["Demand"])
