@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
-from pymongo import MongoClient
+from pymongo import MongoClient, ASCENDING
 from datetime import time
 from dotenv import load_dotenv
 import os, math
@@ -12,6 +12,9 @@ load_dotenv()
 mongo_uri = os.getenv("MONGO_URI")
 client = MongoClient(mongo_uri)
 power_db = client["power_casting_new"]
+
+# --- target collection for consolidated records ---
+bank_adj_coll = power_db["Banking-Adjust-consolidated"]
 
 
 # ---------- Helpers ----------
@@ -313,7 +316,6 @@ async def calculate_consolidated(start_date: str = Query(..., alias="start_date"
     total_backdown_units, total_backdown_cost, weighted_average, mod = compute_totals(plants, plants_by_vc)
     units_left_to_charge = float(battery_details.get("Units_Available", 0.0) or 0.0)
 
-    # 1. Banking
     bank = decide_banking(
         timestamp, banked_units, scheduled_generation, drawl,
         weighted_average, mod, dam, rtm, market_purchase,
@@ -321,7 +323,6 @@ async def calculate_consolidated(start_date: str = Query(..., alias="start_date"
         units_left_to_charge, plants_by_vc
     )
 
-    # 2. Adjustment
     adj = compute_adjustment(
         timestamp, adjusted_units, mod, dam, rtm,
     )
@@ -349,14 +350,37 @@ async def calculate_consolidated(start_date: str = Query(..., alias="start_date"
 
         "adjustment_charges": adj["adjustment_charges"],
         "battery_units_used_for_adjustment": adj["battery_used"],
-        "market_purchase": adj["balance_units"] + bank["market_purchase"],
+        "market_purchase": round(adj["balance_units"] + bank["market_purchase"], 3),
         "battery_charge_rate": adj["battery_charge_rate"],
 
         "battery_units_before_banking": units_left_to_charge,
         "battery_units_available_after_banking": bank["units_available_after"],
-        "units_used_to_charge": units_left_to_charge - bank["units_available_after"],
-        "units_used_to_adjust": adj["units_available_after"] - bank["units_available_after"],
+        "units_used_to_charge": round(units_left_to_charge - bank["units_available_after"], 3),
+        "units_used_to_adjust": round(adj["units_available_after"] - bank["units_available_after"], 3),
         "battery_units_after_adjustment": adj["units_available_after"]
     }
+
+    # Persist document with real datetime for index; keep a string mirror for readability
+    mongo_doc = {
+        **result,
+        "Timestamp": timestamp,
+        "Timestamp_str": result["Timestamp"],
+        "_meta": {"source": "calculate_consolidated"},
+    }
+
+    try:
+        bank_adj_coll.update_one(
+            {"Timestamp": timestamp},
+            {"$set": mongo_doc, "$currentDate": {"updated_at": True}},
+            upsert=True
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=207,
+            content={
+                "warning": f"Computed but failed to persist to Banking-Adjust-consolidated: {str(e)}",
+                **result
+            }
+        )
 
     return JSONResponse(content=result)

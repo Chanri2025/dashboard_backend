@@ -51,6 +51,9 @@ async def lifespan(app: FastAPI):
     app.state.mongo_sync = sm_client
     mdb = sm_client["powercasting"]
 
+    # 👉 also open the DB where your consolidated docs are stored
+    mdb_new = sm_client["power_casting_new"]  # <— added
+
     # 👉 expose the DB handle that your routes expect
     app.state.mongo_sync_db = mdb
 
@@ -58,19 +61,32 @@ async def lifespan(app: FastAPI):
     try:
         sm_client.admin.command("ping")
     except Exception as e:
-        # Close what we opened before bubbling up
         am_client.close()
         sm_client.close()
         raise RuntimeError(f"MongoDB ping failed: {e}") from e
 
     # Build indexes once, idempotently
     drop_mismatch = os.getenv("ALLOW_INDEX_DROP", "false").lower() == "true"
+
+    # Existing indexes (powercasting)
     ensure_index(mdb["Demand"], [("TimeStamp", ASCENDING)], name="ts", unique=False, drop_if_mismatch=drop_mismatch)
-    ensure_index(mdb["Banking_Data"], [("TimeStamp", ASCENDING)], name="ts", unique=False, drop_if_mismatch=drop_mismatch)
-    ensure_index(mdb["IEX_Generation"], [("TimeStamp", ASCENDING)], name="ts", unique=False, drop_if_mismatch=drop_mismatch)
+    ensure_index(mdb["Banking_Data"], [("TimeStamp", ASCENDING)], name="ts", unique=False,
+                 drop_if_mismatch=drop_mismatch)
+    ensure_index(mdb["IEX_Generation"], [("TimeStamp", ASCENDING)], name="ts", unique=False,
+                 drop_if_mismatch=drop_mismatch)
     ensure_index(mdb["mustrunplantconsumption"], [("TimeStamp", ASCENDING), ("Plant_Name", ASCENDING)],
                  name="ts_plant", unique=False, drop_if_mismatch=drop_mismatch)
-    ensure_index(mdb["Demand_Output"], [("TimeStamp", ASCENDING)], name="ts", unique=True, drop_if_mismatch=drop_mismatch)
+    ensure_index(mdb["Demand_Output"], [("TimeStamp", ASCENDING)], name="ts", unique=True,
+                 drop_if_mismatch=drop_mismatch)
+
+    # ✅ NEW: index for consolidated collection in power_casting_new
+    ensure_index(
+        mdb_new["Banking-Adjust-consolidated"],
+        [("Timestamp", ASCENDING)],
+        name="timestamp_unique",
+        unique=True,
+        drop_if_mismatch=drop_mismatch,
+    )
 
     try:
         yield
@@ -107,6 +123,7 @@ app.include_router(power_theft_router, prefix="/power-theft", tags=["Power - The
 app.include_router(procurement_router, prefix="/procurement", tags=["Procurement"])
 app.include_router(region_router, prefix="/region", tags=["Region"])
 app.include_router(substation_router, prefix="/substation", tags=["Sub - Station"])
+
 
 # ── Dashboard Route ────────────────────────────────────────────────
 @app.get("/dashboard")
@@ -204,6 +221,7 @@ async def get_dashboard(
         "iex": iex_rows,
         "procurement": procurement_rows,
     }
+
 
 @app.get("/")
 async def root():
