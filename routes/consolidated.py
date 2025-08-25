@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pymongo import MongoClient, ASCENDING
-from datetime import time
+from datetime import time, timedelta
 from dotenv import load_dotenv
 import os, math
 from Helpers.helpers import parse_start_timestamp
@@ -111,13 +111,20 @@ def fetch_market_prices(ts):
 
 
 def fetch_battery_status(ts):
-    # most recent at or before ts
-    doc = power_db["Battery_Status"].find_one({"Timestamp": ts}, sort=[("Timestamp", -1)])
+    # Always fetch the most recent record strictly before ts
+    doc = power_db["Battery_Status"].find_one(
+        {"Timestamp": {"$lt": ts}},
+        sort=[("Timestamp", -1)]
+    )
+
     if not doc:
-        doc = power_db["Battery_Status"].find_one({"Timestamp": {"$lt": ts}}, sort=[("Timestamp", -1)])
-    if not doc:
-        # initialize if missing
-        doc = {"Units_Available": 0.0, "Cycle": "NO_CHARGE"}
+        # initialize with default if nothing found
+        doc = {
+            "Timestamp": ts - timedelta(minutes=15),  # previous block
+            "Units_Available": 2823529.412,
+            "Cycle": "NO_CHARGE"
+        }
+
     return doc
 
 
@@ -337,7 +344,7 @@ async def calculate_consolidated(start_date: str = Query(..., alias="start_date"
         "dam_rate": round(dam, 2),
         "rtm_rate": round(rtm, 2),
 
-        "plant_backdown_data": plants,
+        "plant_backdown_data": sorted(plants, key=lambda r: r["VC"]),
         "total_backdown_units": round(total_backdown_units, 3),
         "total_backdown_cost": round(total_backdown_cost, 2),
         "weighted_avg_rate": round(bank["weighted_average"], 2),

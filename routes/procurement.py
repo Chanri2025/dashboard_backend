@@ -48,13 +48,21 @@ def _load_must_run_plants() -> List[Dict[str, Any]]:
     try:
         cur = conn.cursor(dictionary=True)
         cur.execute("""
-            SELECT name, Code, Rated_Capacity, PAF, PLF, Type,
-                   Technical_Minimum, Aux_Consumption, Variable_Cost,
-                   Max_Power, Min_Power
-            FROM plant_details
-            WHERE Type='Must run'
-            ORDER BY Variable_Cost
-        """)
+                    SELECT name,
+                           Code,
+                           Rated_Capacity,
+                           PAF,
+                           PLF,
+                           Type,
+                           Technical_Minimum,
+                           Aux_Consumption,
+                           Variable_Cost,
+                           Max_Power,
+                           Min_Power
+                    FROM plant_details
+                    WHERE Type = 'Must run'
+                    ORDER BY Variable_Cost
+                    """)
         rows = cur.fetchall()
         return rows
     finally:
@@ -98,7 +106,7 @@ def _load_backdown_table() -> List[Dict[str, float]]:
         cur.close();
         conn.close()
 
-os
+
 # ───────────────────── helpers ─────────────────────
 def _map_and_calculate(alloc: Dict[str, Any], plant_dict: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
     p = plant_dict.get(alloc["plant_code"], {})
@@ -111,6 +119,7 @@ def _map_and_calculate(alloc: Dict[str, Any], plant_dict: Dict[str, Dict[str, An
     plf = 0.0 if denom <= 0 else alloc["allocated_gen"] / denom
 
     gen = alloc["allocated_gen"]
+    max_energy = alloc["max_gen"]
     net_cost = gen * var_cost
 
     return {
@@ -124,6 +133,7 @@ def _map_and_calculate(alloc: Dict[str, Any], plant_dict: Dict[str, Dict[str, An
         "max_power": round(alloc["max_gen"], 3),
         "min_power": round(alloc["min_gen"], 3),
         "generated_energy": round(gen, 3),
+        "energy_not_taken": round(max_energy - gen, 3),
         "net_cost": round(net_cost, 2),
     }
 
@@ -250,10 +260,16 @@ def _get_must_run(banked_kwh: float, ts_dt: Union[str, datetime]) -> Dict[str, A
         code = p["Code"]
         mw_val = preds.get(code, 0.0)
         gen_kwh = round(mw_val * 1000.0 * 0.25, 3)  # 15-min block
+
         var_cost = float(p["Variable_Cost"])
         net_cost = round(gen_kwh * var_cost, 2)
+
+        # Treat Max_Power as per-block max energy (consistent with your other function's max_gen)
+        max_energy = float(p.get("Max_Power", 0.0))
+
         gen_all += gen_kwh
         cost_all += net_cost
+
         data.append({
             "plant_name": p["name"],
             "plant_code": code,
@@ -264,8 +280,9 @@ def _get_must_run(banked_kwh: float, ts_dt: Union[str, datetime]) -> Dict[str, A
             "Aux_Consumption": p["Aux_Consumption"],
             "Variable_Cost": var_cost,
             "generated_energy": gen_kwh,
-            "max_power": p["Max_Power"],
+            "max_power": max_energy,  # kept your field name
             "min_power": p["Min_Power"],
+            "energy_not_taken": round(max_energy - gen_kwh, 3),  # ← NEW
             "net_cost": net_cost,
         })
 
