@@ -954,534 +954,1116 @@
     <user id="299" parent="1" name="root">
       <Host>localhost</Host>
     </user>
-    <table id="300" parent="288" name="consumer_details">
+    <table id="300" parent="288" name="bill_lines">
       <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="301" parent="288" name="division">
+    <table id="301" parent="288" name="bills">
       <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="302" parent="288" name="dtr">
+    <table id="302" parent="288" name="complaint_categories">
       <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="303" parent="288" name="feeder">
+    <table id="303" parent="288" name="complaint_notes">
       <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="304" parent="288" name="region">
+    <table id="304" parent="288" name="complaints">
       <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="305" parent="288" name="substation">
+    <table id="305" parent="288" name="consumer_details">
       <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="306" parent="289" name="auth_audit">
+    <table id="306" parent="288" name="consumer_tariffs">
       <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="307" parent="289" name="back_down_table">
+    <table id="307" parent="288" name="division">
       <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="308" parent="289" name="consumer_details">
+    <table id="308" parent="288" name="dtr">
       <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="309" parent="289" name="demand_data">
+    <table id="309" parent="288" name="feeder">
       <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="310" parent="289" name="paf_details">
+    <table id="310" parent="288" name="region">
       <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="311" parent="289" name="plant_details">
+    <table id="311" parent="288" name="substation">
       <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="312" parent="289" name="refresh_tokens">
+    <table id="312" parent="288" name="tariff_plans">
       <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="313" parent="289" name="roles">
+    <table id="313" parent="288" name="tariff_slabs">
       <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="314" parent="289" name="user_roles">
+    <table id="314" parent="289" name="auth_audit">
       <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <table id="315" parent="289" name="users">
+    <table id="315" parent="289" name="back_down_table">
       <DetailsLevel>3</DetailsLevel>
       <Engine>InnoDB</Engine>
       <CollationName>utf8mb4_0900_ai_ci</CollationName>
     </table>
-    <column id="316" parent="300" name="id">
+    <table id="316" parent="289" name="consumer_details">
+      <DetailsLevel>3</DetailsLevel>
+      <Engine>InnoDB</Engine>
+      <CollationName>utf8mb4_0900_ai_ci</CollationName>
+    </table>
+    <table id="317" parent="289" name="demand_data">
+      <DetailsLevel>3</DetailsLevel>
+      <Engine>InnoDB</Engine>
+      <CollationName>utf8mb4_0900_ai_ci</CollationName>
+    </table>
+    <table id="318" parent="289" name="paf_details">
+      <DetailsLevel>3</DetailsLevel>
+      <Engine>InnoDB</Engine>
+      <CollationName>utf8mb4_0900_ai_ci</CollationName>
+    </table>
+    <table id="319" parent="289" name="plant_details">
+      <DetailsLevel>3</DetailsLevel>
+      <Engine>InnoDB</Engine>
+      <CollationName>utf8mb4_0900_ai_ci</CollationName>
+    </table>
+    <table id="320" parent="289" name="refresh_tokens">
+      <DetailsLevel>3</DetailsLevel>
+      <Engine>InnoDB</Engine>
+      <CollationName>utf8mb4_0900_ai_ci</CollationName>
+    </table>
+    <table id="321" parent="289" name="roles">
+      <DetailsLevel>3</DetailsLevel>
+      <Engine>InnoDB</Engine>
+      <CollationName>utf8mb4_0900_ai_ci</CollationName>
+    </table>
+    <table id="322" parent="289" name="user_roles">
+      <DetailsLevel>3</DetailsLevel>
+      <Engine>InnoDB</Engine>
+      <CollationName>utf8mb4_0900_ai_ci</CollationName>
+    </table>
+    <table id="323" parent="289" name="users">
+      <DetailsLevel>3</DetailsLevel>
+      <Engine>InnoDB</Engine>
+      <CollationName>utf8mb4_0900_ai_ci</CollationName>
+    </table>
+    <column id="324" parent="300" name="id">
       <AutoIncrement>1</AutoIncrement>
       <NotNull>1</NotNull>
       <Position>1</Position>
       <StoredType>bigint unsigned|0s</StoredType>
     </column>
-    <column id="317" parent="300" name="consumer_id">
+    <column id="325" parent="300" name="bill_id">
+      <NotNull>1</NotNull>
+      <Position>2</Position>
+      <StoredType>bigint unsigned|0s</StoredType>
+    </column>
+    <column id="326" parent="300" name="line_type">
+      <NotNull>1</NotNull>
+      <Position>3</Position>
+      <StoredType>enum(&apos;ENERGY&apos;, &apos;FIXED&apos;, &apos;DEMAND&apos;, &apos;TAX&apos;, &apos;ADJUSTMENT&apos;)|0e</StoredType>
+    </column>
+    <column id="327" parent="300" name="description">
+      <Position>4</Position>
+      <StoredType>varchar(255)|0s</StoredType>
+    </column>
+    <column id="328" parent="300" name="quantity">
+      <DefaultExpression>0.000000</DefaultExpression>
+      <NotNull>1</NotNull>
+      <Position>5</Position>
+      <StoredType>decimal(16,6 digit)|0s</StoredType>
+    </column>
+    <column id="329" parent="300" name="rate">
+      <DefaultExpression>0.000000</DefaultExpression>
+      <NotNull>1</NotNull>
+      <Position>6</Position>
+      <StoredType>decimal(12,6 digit)|0s</StoredType>
+    </column>
+    <column id="330" parent="300" name="amount">
+      <DefaultExpression>0.0000</DefaultExpression>
+      <NotNull>1</NotNull>
+      <Position>7</Position>
+      <StoredType>decimal(14,4 digit)|0s</StoredType>
+    </column>
+    <foreign-key id="331" parent="300" name="bill_lines_ibfk_1">
+      <ColNames>bill_id</ColNames>
+      <OnDelete>cascade</OnDelete>
+      <RefColNames>id</RefColNames>
+      <RefTableName>bills</RefTableName>
+    </foreign-key>
+    <index id="332" parent="300" name="PRIMARY">
+      <ColNames>id</ColNames>
+      <Type>btree</Type>
+      <Unique>1</Unique>
+    </index>
+    <index id="333" parent="300" name="idx_bill_id">
+      <ColNames>bill_id</ColNames>
+      <Type>btree</Type>
+    </index>
+    <key id="334" parent="300" name="PRIMARY">
+      <NameSurrogate>1</NameSurrogate>
+      <Primary>1</Primary>
+      <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
+    </key>
+    <column id="335" parent="301" name="id">
+      <AutoIncrement>1</AutoIncrement>
+      <NotNull>1</NotNull>
+      <Position>1</Position>
+      <StoredType>bigint unsigned|0s</StoredType>
+    </column>
+    <column id="336" parent="301" name="consumer_id">
       <NotNull>1</NotNull>
       <Position>2</Position>
       <StoredType>varchar(50)|0s</StoredType>
     </column>
-    <column id="318" parent="300" name="circle">
+    <column id="337" parent="301" name="period_start">
+      <NotNull>1</NotNull>
+      <Position>3</Position>
+      <StoredType>datetime|0s</StoredType>
+    </column>
+    <column id="338" parent="301" name="period_end">
+      <NotNull>1</NotNull>
+      <Position>4</Position>
+      <StoredType>datetime|0s</StoredType>
+    </column>
+    <column id="339" parent="301" name="meter_type">
+      <NotNull>1</NotNull>
+      <Position>5</Position>
+      <StoredType>enum(&apos;LT&apos;, &apos;OA&apos;)|0e</StoredType>
+    </column>
+    <column id="340" parent="301" name="kwh_import">
+      <DefaultExpression>0.000000</DefaultExpression>
+      <NotNull>1</NotNull>
+      <Position>6</Position>
+      <StoredType>decimal(16,6 digit)|0s</StoredType>
+    </column>
+    <column id="341" parent="301" name="kwh_export">
+      <DefaultExpression>0.000000</DefaultExpression>
+      <NotNull>1</NotNull>
+      <Position>7</Position>
+      <StoredType>decimal(16,6 digit)|0s</StoredType>
+    </column>
+    <column id="342" parent="301" name="demand_kw">
+      <Position>8</Position>
+      <StoredType>decimal(12,4 digit)|0s</StoredType>
+    </column>
+    <column id="343" parent="301" name="fixed_charge">
+      <DefaultExpression>0.0000</DefaultExpression>
+      <NotNull>1</NotNull>
+      <Position>9</Position>
+      <StoredType>decimal(12,4 digit)|0s</StoredType>
+    </column>
+    <column id="344" parent="301" name="energy_charge">
+      <DefaultExpression>0.0000</DefaultExpression>
+      <NotNull>1</NotNull>
+      <Position>10</Position>
+      <StoredType>decimal(14,4 digit)|0s</StoredType>
+    </column>
+    <column id="345" parent="301" name="tax_amount">
+      <DefaultExpression>0.0000</DefaultExpression>
+      <NotNull>1</NotNull>
+      <Position>11</Position>
+      <StoredType>decimal(14,4 digit)|0s</StoredType>
+    </column>
+    <column id="346" parent="301" name="adjustments">
+      <DefaultExpression>0.0000</DefaultExpression>
+      <NotNull>1</NotNull>
+      <Position>12</Position>
+      <StoredType>decimal(14,4 digit)|0s</StoredType>
+    </column>
+    <column id="347" parent="301" name="total_amount">
+      <DefaultExpression>0.0000</DefaultExpression>
+      <NotNull>1</NotNull>
+      <Position>13</Position>
+      <StoredType>decimal(14,4 digit)|0s</StoredType>
+    </column>
+    <column id="348" parent="301" name="currency">
+      <DefaultExpression>&apos;INR&apos;</DefaultExpression>
+      <NotNull>1</NotNull>
+      <Position>14</Position>
+      <StoredType>char(3)|0s</StoredType>
+    </column>
+    <column id="349" parent="301" name="status">
+      <DefaultExpression>&apos;DRAFT&apos;</DefaultExpression>
+      <NotNull>1</NotNull>
+      <Position>15</Position>
+      <StoredType>enum(&apos;DRAFT&apos;, &apos;ISSUED&apos;, &apos;PAID&apos;, &apos;CANCELLED&apos;)|0e</StoredType>
+    </column>
+    <column id="350" parent="301" name="created_at">
+      <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
+      <Position>16</Position>
+      <StoredType>timestamp|0s</StoredType>
+    </column>
+    <column id="351" parent="301" name="updated_at">
+      <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
+      <OnUpdate>CURRENT_TIMESTAMP</OnUpdate>
+      <Position>17</Position>
+      <StoredType>timestamp|0s</StoredType>
+    </column>
+    <index id="352" parent="301" name="PRIMARY">
+      <ColNames>id</ColNames>
+      <Type>btree</Type>
+      <Unique>1</Unique>
+    </index>
+    <index id="353" parent="301" name="uq_bill_unique">
+      <ColNames>consumer_id
+period_start
+period_end
+meter_type</ColNames>
+      <Type>btree</Type>
+      <Unique>1</Unique>
+    </index>
+    <index id="354" parent="301" name="idx_bill_consumer">
+      <ColNames>consumer_id</ColNames>
+      <Type>btree</Type>
+    </index>
+    <index id="355" parent="301" name="idx_bill_period">
+      <ColNames>period_start
+period_end</ColNames>
+      <Type>btree</Type>
+    </index>
+    <key id="356" parent="301" name="PRIMARY">
+      <NameSurrogate>1</NameSurrogate>
+      <Primary>1</Primary>
+      <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
+    </key>
+    <key id="357" parent="301" name="uq_bill_unique">
+      <UnderlyingIndexName>uq_bill_unique</UnderlyingIndexName>
+    </key>
+    <column id="358" parent="302" name="id">
+      <AutoIncrement>1</AutoIncrement>
+      <NotNull>1</NotNull>
+      <Position>1</Position>
+      <StoredType>bigint unsigned|0s</StoredType>
+    </column>
+    <column id="359" parent="302" name="code">
+      <NotNull>1</NotNull>
+      <Position>2</Position>
+      <StoredType>varchar(50)|0s</StoredType>
+    </column>
+    <column id="360" parent="302" name="description">
+      <Position>3</Position>
+      <StoredType>varchar(255)|0s</StoredType>
+    </column>
+    <index id="361" parent="302" name="PRIMARY">
+      <ColNames>id</ColNames>
+      <Type>btree</Type>
+      <Unique>1</Unique>
+    </index>
+    <index id="362" parent="302" name="code">
+      <ColNames>code</ColNames>
+      <Type>btree</Type>
+      <Unique>1</Unique>
+    </index>
+    <key id="363" parent="302" name="PRIMARY">
+      <NameSurrogate>1</NameSurrogate>
+      <Primary>1</Primary>
+      <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
+    </key>
+    <key id="364" parent="302" name="code">
+      <UnderlyingIndexName>code</UnderlyingIndexName>
+    </key>
+    <column id="365" parent="303" name="id">
+      <AutoIncrement>1</AutoIncrement>
+      <NotNull>1</NotNull>
+      <Position>1</Position>
+      <StoredType>bigint unsigned|0s</StoredType>
+    </column>
+    <column id="366" parent="303" name="complaint_id">
+      <NotNull>1</NotNull>
+      <Position>2</Position>
+      <StoredType>bigint unsigned|0s</StoredType>
+    </column>
+    <column id="367" parent="303" name="author">
       <NotNull>1</NotNull>
       <Position>3</Position>
       <StoredType>varchar(100)|0s</StoredType>
     </column>
-    <column id="319" parent="300" name="division">
+    <column id="368" parent="303" name="note">
+      <NotNull>1</NotNull>
+      <Position>4</Position>
+      <StoredType>text|0s</StoredType>
+    </column>
+    <column id="369" parent="303" name="created_at">
+      <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
+      <Position>5</Position>
+      <StoredType>timestamp|0s</StoredType>
+    </column>
+    <foreign-key id="370" parent="303" name="complaint_notes_ibfk_1">
+      <ColNames>complaint_id</ColNames>
+      <OnDelete>cascade</OnDelete>
+      <RefColNames>id</RefColNames>
+      <RefTableName>complaints</RefTableName>
+    </foreign-key>
+    <index id="371" parent="303" name="PRIMARY">
+      <ColNames>id</ColNames>
+      <Type>btree</Type>
+      <Unique>1</Unique>
+    </index>
+    <index id="372" parent="303" name="idx_notes_complaint">
+      <ColNames>complaint_id</ColNames>
+      <Type>btree</Type>
+    </index>
+    <key id="373" parent="303" name="PRIMARY">
+      <NameSurrogate>1</NameSurrogate>
+      <Primary>1</Primary>
+      <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
+    </key>
+    <column id="374" parent="304" name="id">
+      <AutoIncrement>1</AutoIncrement>
+      <NotNull>1</NotNull>
+      <Position>1</Position>
+      <StoredType>bigint unsigned|0s</StoredType>
+    </column>
+    <column id="375" parent="304" name="consumer_id">
+      <NotNull>1</NotNull>
+      <Position>2</Position>
+      <StoredType>varchar(50)|0s</StoredType>
+    </column>
+    <column id="376" parent="304" name="category_id">
+      <NotNull>1</NotNull>
+      <Position>3</Position>
+      <StoredType>bigint unsigned|0s</StoredType>
+    </column>
+    <column id="377" parent="304" name="title">
+      <NotNull>1</NotNull>
+      <Position>4</Position>
+      <StoredType>varchar(200)|0s</StoredType>
+    </column>
+    <column id="378" parent="304" name="description">
+      <NotNull>1</NotNull>
+      <Position>5</Position>
+      <StoredType>text|0s</StoredType>
+    </column>
+    <column id="379" parent="304" name="status">
+      <DefaultExpression>&apos;OPEN&apos;</DefaultExpression>
+      <NotNull>1</NotNull>
+      <Position>6</Position>
+      <StoredType>enum(&apos;OPEN&apos;, &apos;IN_PROGRESS&apos;, &apos;RESOLVED&apos;, &apos;CLOSED&apos;)|0e</StoredType>
+    </column>
+    <column id="380" parent="304" name="priority">
+      <DefaultExpression>&apos;MEDIUM&apos;</DefaultExpression>
+      <NotNull>1</NotNull>
+      <Position>7</Position>
+      <StoredType>enum(&apos;LOW&apos;, &apos;MEDIUM&apos;, &apos;HIGH&apos;, &apos;URGENT&apos;)|0e</StoredType>
+    </column>
+    <column id="381" parent="304" name="assigned_to">
+      <Position>8</Position>
+      <StoredType>varchar(100)|0s</StoredType>
+    </column>
+    <column id="382" parent="304" name="created_at">
+      <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
+      <Position>9</Position>
+      <StoredType>timestamp|0s</StoredType>
+    </column>
+    <column id="383" parent="304" name="updated_at">
+      <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
+      <OnUpdate>CURRENT_TIMESTAMP</OnUpdate>
+      <Position>10</Position>
+      <StoredType>timestamp|0s</StoredType>
+    </column>
+    <column id="384" parent="304" name="resolved_at">
+      <Position>11</Position>
+      <StoredType>timestamp|0s</StoredType>
+    </column>
+    <foreign-key id="385" parent="304" name="complaints_ibfk_1">
+      <ColNames>category_id</ColNames>
+      <RefColNames>id</RefColNames>
+      <RefTableName>complaint_categories</RefTableName>
+    </foreign-key>
+    <index id="386" parent="304" name="PRIMARY">
+      <ColNames>id</ColNames>
+      <Type>btree</Type>
+      <Unique>1</Unique>
+    </index>
+    <index id="387" parent="304" name="idx_complaints_consumer">
+      <ColNames>consumer_id</ColNames>
+      <Type>btree</Type>
+    </index>
+    <index id="388" parent="304" name="category_id">
+      <ColNames>category_id</ColNames>
+      <Type>btree</Type>
+    </index>
+    <index id="389" parent="304" name="idx_complaints_status">
+      <ColNames>status</ColNames>
+      <Type>btree</Type>
+    </index>
+    <key id="390" parent="304" name="PRIMARY">
+      <NameSurrogate>1</NameSurrogate>
+      <Primary>1</Primary>
+      <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
+    </key>
+    <column id="391" parent="305" name="id">
+      <AutoIncrement>1</AutoIncrement>
+      <NotNull>1</NotNull>
+      <Position>1</Position>
+      <StoredType>bigint unsigned|0s</StoredType>
+    </column>
+    <column id="392" parent="305" name="consumer_id">
+      <NotNull>1</NotNull>
+      <Position>2</Position>
+      <StoredType>varchar(50)|0s</StoredType>
+    </column>
+    <column id="393" parent="305" name="circle">
+      <NotNull>1</NotNull>
+      <Position>3</Position>
+      <StoredType>varchar(100)|0s</StoredType>
+    </column>
+    <column id="394" parent="305" name="division">
       <NotNull>1</NotNull>
       <Position>4</Position>
       <StoredType>varchar(150)|0s</StoredType>
     </column>
-    <column id="320" parent="300" name="voltage_kv">
+    <column id="395" parent="305" name="voltage_kv">
       <NotNull>1</NotNull>
       <Position>5</Position>
       <StoredType>smallint unsigned|0s</StoredType>
     </column>
-    <column id="321" parent="300" name="sanction_load_kw">
+    <column id="396" parent="305" name="sanction_load_kw">
       <NotNull>1</NotNull>
       <Position>6</Position>
       <StoredType>int unsigned|0s</StoredType>
     </column>
-    <column id="322" parent="300" name="oa_capacity_kw">
+    <column id="397" parent="305" name="oa_capacity_kw">
       <NotNull>1</NotNull>
       <Position>7</Position>
       <StoredType>int unsigned|0s</StoredType>
     </column>
-    <column id="323" parent="300" name="consumer_type">
+    <column id="398" parent="305" name="consumer_type">
       <NotNull>1</NotNull>
       <Position>8</Position>
       <StoredType>varchar(50)|0s</StoredType>
     </column>
-    <column id="324" parent="300" name="created_at">
+    <column id="399" parent="305" name="created_at">
       <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
       <NotNull>1</NotNull>
       <Position>9</Position>
       <StoredType>timestamp|0s</StoredType>
     </column>
-    <column id="325" parent="300" name="updated_at">
+    <column id="400" parent="305" name="updated_at">
       <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
       <NotNull>1</NotNull>
       <OnUpdate>CURRENT_TIMESTAMP</OnUpdate>
       <Position>10</Position>
       <StoredType>timestamp|0s</StoredType>
     </column>
-    <column id="326" parent="300" name="Name">
+    <column id="401" parent="305" name="Name">
       <Position>11</Position>
       <StoredType>varchar(255)|0s</StoredType>
     </column>
-    <column id="327" parent="300" name="Address">
+    <column id="402" parent="305" name="Address">
       <Position>12</Position>
       <StoredType>varchar(255)|0s</StoredType>
     </column>
-    <column id="328" parent="300" name="District">
+    <column id="403" parent="305" name="District">
       <Position>13</Position>
       <StoredType>varchar(255)|0s</StoredType>
     </column>
-    <column id="329" parent="300" name="PinCode">
+    <column id="404" parent="305" name="PinCode">
       <Position>14</Position>
       <StoredType>varchar(50)|0s</StoredType>
     </column>
-    <column id="330" parent="300" name="DTR_id">
+    <column id="405" parent="305" name="DTR_id">
       <Position>15</Position>
       <StoredType>varchar(255)|0s</StoredType>
     </column>
-    <index id="331" parent="300" name="PRIMARY">
+    <index id="406" parent="305" name="PRIMARY">
       <ColNames>id</ColNames>
       <Type>btree</Type>
       <Unique>1</Unique>
     </index>
-    <index id="332" parent="300" name="uq_consumer_details_id">
+    <index id="407" parent="305" name="uq_consumer_details_id">
       <ColNames>consumer_id</ColNames>
       <Type>btree</Type>
       <Unique>1</Unique>
     </index>
-    <index id="333" parent="300" name="idx_district">
+    <index id="408" parent="305" name="idx_district">
       <ColNames>District</ColNames>
       <Type>btree</Type>
     </index>
-    <index id="334" parent="300" name="idx_dtr">
+    <index id="409" parent="305" name="idx_dtr">
       <ColNames>DTR_id</ColNames>
       <Type>btree</Type>
     </index>
-    <key id="335" parent="300" name="PRIMARY">
+    <key id="410" parent="305" name="PRIMARY">
       <NameSurrogate>1</NameSurrogate>
       <Primary>1</Primary>
       <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
     </key>
-    <key id="336" parent="300" name="uq_consumer_details_id">
+    <key id="411" parent="305" name="uq_consumer_details_id">
       <UnderlyingIndexName>uq_consumer_details_id</UnderlyingIndexName>
     </key>
-    <column id="337" parent="301" name="division_id">
+    <column id="412" parent="306" name="id">
+      <AutoIncrement>1</AutoIncrement>
+      <NotNull>1</NotNull>
+      <Position>1</Position>
+      <StoredType>bigint unsigned|0s</StoredType>
+    </column>
+    <column id="413" parent="306" name="consumer_id">
+      <NotNull>1</NotNull>
+      <Position>2</Position>
+      <StoredType>varchar(50)|0s</StoredType>
+    </column>
+    <column id="414" parent="306" name="tariff_id">
+      <NotNull>1</NotNull>
+      <Position>3</Position>
+      <StoredType>bigint unsigned|0s</StoredType>
+    </column>
+    <column id="415" parent="306" name="valid_from">
+      <NotNull>1</NotNull>
+      <Position>4</Position>
+      <StoredType>date|0s</StoredType>
+    </column>
+    <column id="416" parent="306" name="valid_to">
+      <Position>5</Position>
+      <StoredType>date|0s</StoredType>
+    </column>
+    <column id="417" parent="306" name="created_at">
+      <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
+      <Position>6</Position>
+      <StoredType>timestamp|0s</StoredType>
+    </column>
+    <foreign-key id="418" parent="306" name="consumer_tariffs_ibfk_1">
+      <ColNames>tariff_id</ColNames>
+      <RefColNames>id</RefColNames>
+      <RefTableName>tariff_plans</RefTableName>
+    </foreign-key>
+    <index id="419" parent="306" name="PRIMARY">
+      <ColNames>id</ColNames>
+      <Type>btree</Type>
+      <Unique>1</Unique>
+    </index>
+    <index id="420" parent="306" name="uq_consumer_tariff">
+      <ColNames>consumer_id
+tariff_id
+valid_from</ColNames>
+      <Type>btree</Type>
+      <Unique>1</Unique>
+    </index>
+    <index id="421" parent="306" name="tariff_id">
+      <ColNames>tariff_id</ColNames>
+      <Type>btree</Type>
+    </index>
+    <key id="422" parent="306" name="PRIMARY">
+      <NameSurrogate>1</NameSurrogate>
+      <Primary>1</Primary>
+      <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
+    </key>
+    <key id="423" parent="306" name="uq_consumer_tariff">
+      <UnderlyingIndexName>uq_consumer_tariff</UnderlyingIndexName>
+    </key>
+    <column id="424" parent="307" name="division_id">
       <Position>1</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="338" parent="301" name="region_id">
+    <column id="425" parent="307" name="region_id">
       <Position>2</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="339" parent="301" name="division_name">
+    <column id="426" parent="307" name="division_name">
       <Position>3</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="340" parent="302" name="dtr_id">
+    <column id="427" parent="308" name="dtr_id">
       <Position>1</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="341" parent="302" name="feeder_id">
+    <column id="428" parent="308" name="feeder_id">
       <Position>2</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="342" parent="302" name="location_description">
+    <column id="429" parent="308" name="location_description">
       <Position>3</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="343" parent="302" name="capacity_kva">
+    <column id="430" parent="308" name="capacity_kva">
       <Position>4</Position>
       <StoredType>double|0s</StoredType>
     </column>
-    <column id="344" parent="302" name="residential_connections">
+    <column id="431" parent="308" name="residential_connections">
       <Position>5</Position>
       <StoredType>bigint|0s</StoredType>
     </column>
-    <column id="345" parent="302" name="installed_date">
+    <column id="432" parent="308" name="installed_date">
       <Position>6</Position>
       <StoredType>date|0s</StoredType>
     </column>
-    <column id="346" parent="303" name="feeder_id">
+    <column id="433" parent="309" name="feeder_id">
       <Position>1</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="347" parent="303" name="substation_id">
+    <column id="434" parent="309" name="substation_id">
       <Position>2</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="348" parent="303" name="feeder_name">
+    <column id="435" parent="309" name="feeder_name">
       <Position>3</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="349" parent="303" name="capacity_amperes">
+    <column id="436" parent="309" name="capacity_amperes">
       <Position>4</Position>
       <StoredType>double|0s</StoredType>
     </column>
-    <column id="350" parent="304" name="region_id">
+    <column id="437" parent="310" name="region_id">
       <Position>1</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="351" parent="304" name="region_name">
+    <column id="438" parent="310" name="region_name">
       <Position>2</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="352" parent="304" name="operational_contact">
+    <column id="439" parent="310" name="operational_contact">
       <Position>3</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="353" parent="305" name="substation_id">
+    <column id="440" parent="311" name="substation_id">
       <Position>1</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="354" parent="305" name="division_id">
+    <column id="441" parent="311" name="division_id">
       <Position>2</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="355" parent="305" name="substation_name">
+    <column id="442" parent="311" name="substation_name">
       <Position>3</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="356" parent="305" name="capacity_kva">
+    <column id="443" parent="311" name="capacity_kva">
       <Position>4</Position>
       <StoredType>double|0s</StoredType>
     </column>
-    <column id="357" parent="305" name="primary_voltage">
+    <column id="444" parent="311" name="primary_voltage">
       <Position>5</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="358" parent="306" name="id">
+    <column id="445" parent="312" name="id">
+      <AutoIncrement>1</AutoIncrement>
+      <NotNull>1</NotNull>
+      <Position>1</Position>
+      <StoredType>bigint unsigned|0s</StoredType>
+    </column>
+    <column id="446" parent="312" name="code">
+      <NotNull>1</NotNull>
+      <Position>2</Position>
+      <StoredType>varchar(50)|0s</StoredType>
+    </column>
+    <column id="447" parent="312" name="description">
+      <Position>3</Position>
+      <StoredType>varchar(255)|0s</StoredType>
+    </column>
+    <column id="448" parent="312" name="consumer_type">
+      <NotNull>1</NotNull>
+      <Position>4</Position>
+      <StoredType>varchar(50)|0s</StoredType>
+    </column>
+    <column id="449" parent="312" name="voltage_kv">
+      <NotNull>1</NotNull>
+      <Position>5</Position>
+      <StoredType>smallint unsigned|0s</StoredType>
+    </column>
+    <column id="450" parent="312" name="is_time_of_day">
+      <DefaultExpression>0</DefaultExpression>
+      <NotNull>1</NotNull>
+      <Position>6</Position>
+      <StoredType>tinyint(1)|0s</StoredType>
+    </column>
+    <column id="451" parent="312" name="tax_percent">
+      <DefaultExpression>0.000</DefaultExpression>
+      <NotNull>1</NotNull>
+      <Position>7</Position>
+      <StoredType>decimal(6,3 digit)|0s</StoredType>
+    </column>
+    <column id="452" parent="312" name="fixed_charge">
+      <DefaultExpression>0.0000</DefaultExpression>
+      <NotNull>1</NotNull>
+      <Position>8</Position>
+      <StoredType>decimal(12,4 digit)|0s</StoredType>
+    </column>
+    <column id="453" parent="312" name="demand_charge_per_kw">
+      <DefaultExpression>0.0000</DefaultExpression>
+      <NotNull>1</NotNull>
+      <Position>9</Position>
+      <StoredType>decimal(12,4 digit)|0s</StoredType>
+    </column>
+    <column id="454" parent="312" name="effective_from">
+      <NotNull>1</NotNull>
+      <Position>10</Position>
+      <StoredType>date|0s</StoredType>
+    </column>
+    <column id="455" parent="312" name="effective_to">
+      <Position>11</Position>
+      <StoredType>date|0s</StoredType>
+    </column>
+    <column id="456" parent="312" name="created_at">
+      <DefaultExpression>CURRENT_TIMESTAMP</DefaultExpression>
+      <Position>12</Position>
+      <StoredType>timestamp|0s</StoredType>
+    </column>
+    <index id="457" parent="312" name="PRIMARY">
+      <ColNames>id</ColNames>
+      <Type>btree</Type>
+      <Unique>1</Unique>
+    </index>
+    <index id="458" parent="312" name="code">
+      <ColNames>code</ColNames>
+      <Type>btree</Type>
+      <Unique>1</Unique>
+    </index>
+    <index id="459" parent="312" name="uq_tariff_unique">
+      <ColNames>consumer_type
+voltage_kv
+effective_from</ColNames>
+      <Type>btree</Type>
+      <Unique>1</Unique>
+    </index>
+    <key id="460" parent="312" name="PRIMARY">
+      <NameSurrogate>1</NameSurrogate>
+      <Primary>1</Primary>
+      <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
+    </key>
+    <key id="461" parent="312" name="code">
+      <UnderlyingIndexName>code</UnderlyingIndexName>
+    </key>
+    <key id="462" parent="312" name="uq_tariff_unique">
+      <UnderlyingIndexName>uq_tariff_unique</UnderlyingIndexName>
+    </key>
+    <column id="463" parent="313" name="id">
+      <AutoIncrement>1</AutoIncrement>
+      <NotNull>1</NotNull>
+      <Position>1</Position>
+      <StoredType>bigint unsigned|0s</StoredType>
+    </column>
+    <column id="464" parent="313" name="tariff_id">
+      <NotNull>1</NotNull>
+      <Position>2</Position>
+      <StoredType>bigint unsigned|0s</StoredType>
+    </column>
+    <column id="465" parent="313" name="slab_from_kwh">
+      <DefaultExpression>0.0000</DefaultExpression>
+      <NotNull>1</NotNull>
+      <Position>3</Position>
+      <StoredType>decimal(14,4 digit)|0s</StoredType>
+    </column>
+    <column id="466" parent="313" name="slab_to_kwh">
+      <Position>4</Position>
+      <StoredType>decimal(14,4 digit)|0s</StoredType>
+    </column>
+    <column id="467" parent="313" name="energy_rate_per_kwh">
+      <NotNull>1</NotNull>
+      <Position>5</Position>
+      <StoredType>decimal(12,6 digit)|0s</StoredType>
+    </column>
+    <foreign-key id="468" parent="313" name="tariff_slabs_ibfk_1">
+      <ColNames>tariff_id</ColNames>
+      <OnDelete>cascade</OnDelete>
+      <RefColNames>id</RefColNames>
+      <RefTableName>tariff_plans</RefTableName>
+    </foreign-key>
+    <index id="469" parent="313" name="PRIMARY">
+      <ColNames>id</ColNames>
+      <Type>btree</Type>
+      <Unique>1</Unique>
+    </index>
+    <index id="470" parent="313" name="idx_tariff_id">
+      <ColNames>tariff_id</ColNames>
+      <Type>btree</Type>
+    </index>
+    <key id="471" parent="313" name="PRIMARY">
+      <NameSurrogate>1</NameSurrogate>
+      <Primary>1</Primary>
+      <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
+    </key>
+    <column id="472" parent="314" name="id">
       <Position>1</Position>
       <StoredType>bigint|0s</StoredType>
     </column>
-    <column id="359" parent="306" name="user_id">
+    <column id="473" parent="314" name="user_id">
       <Position>2</Position>
       <StoredType>double|0s</StoredType>
     </column>
-    <column id="360" parent="306" name="event">
+    <column id="474" parent="314" name="event">
       <Position>3</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="361" parent="306" name="details">
+    <column id="475" parent="314" name="details">
       <Position>4</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="362" parent="306" name="ip">
+    <column id="476" parent="314" name="ip">
       <Position>5</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="363" parent="306" name="user_agent">
+    <column id="477" parent="314" name="user_agent">
       <Position>6</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="364" parent="306" name="created_at">
+    <column id="478" parent="314" name="created_at">
       <Position>7</Position>
       <StoredType>datetime|0s</StoredType>
     </column>
-    <column id="365" parent="307" name="Start_Load">
+    <column id="479" parent="315" name="Start_Load">
       <Position>1</Position>
       <StoredType>bigint|0s</StoredType>
     </column>
-    <column id="366" parent="307" name="End_Load">
+    <column id="480" parent="315" name="End_Load">
       <Position>2</Position>
       <StoredType>double|0s</StoredType>
     </column>
-    <column id="367" parent="307" name="SHR">
+    <column id="481" parent="315" name="SHR">
       <Position>3</Position>
       <StoredType>bigint|0s</StoredType>
     </column>
-    <column id="368" parent="307" name="Aux_Consumption">
+    <column id="482" parent="315" name="Aux_Consumption">
       <Position>4</Position>
       <StoredType>double|0s</StoredType>
     </column>
-    <column id="369" parent="308" name="Consumer_Code">
+    <column id="483" parent="316" name="Consumer_Code">
       <Position>1</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="370" parent="308" name="Station_Type">
+    <column id="484" parent="316" name="Station_Type">
       <Position>2</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="371" parent="309" name="TimeStamp">
+    <column id="485" parent="317" name="TimeStamp">
       <Position>1</Position>
       <StoredType>datetime|0s</StoredType>
     </column>
-    <column id="372" parent="309" name="Demand(Actual)">
+    <column id="486" parent="317" name="Demand(Actual)">
       <Position>2</Position>
       <StoredType>double|0s</StoredType>
     </column>
-    <column id="373" parent="309" name="Demand(Pred)">
+    <column id="487" parent="317" name="Demand(Pred)">
       <Position>3</Position>
       <StoredType>double|0s</StoredType>
     </column>
-    <column id="374" parent="310" name="name">
+    <column id="488" parent="318" name="name">
       <Position>1</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="375" parent="310" name="Code">
+    <column id="489" parent="318" name="Code">
       <Position>2</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="376" parent="310" name="Apr">
+    <column id="490" parent="318" name="Apr">
       <Position>3</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="377" parent="310" name="May">
+    <column id="491" parent="318" name="May">
       <Position>4</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="378" parent="310" name="Jun">
+    <column id="492" parent="318" name="Jun">
       <Position>5</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="379" parent="310" name="Jul">
+    <column id="493" parent="318" name="Jul">
       <Position>6</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="380" parent="310" name="Aug">
+    <column id="494" parent="318" name="Aug">
       <Position>7</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="381" parent="310" name="Sep">
+    <column id="495" parent="318" name="Sep">
       <Position>8</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="382" parent="310" name="Oct">
+    <column id="496" parent="318" name="Oct">
       <Position>9</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="383" parent="310" name="Nov">
+    <column id="497" parent="318" name="Nov">
       <Position>10</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="384" parent="310" name="Dec">
+    <column id="498" parent="318" name="Dec">
       <Position>11</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="385" parent="310" name="Jan">
+    <column id="499" parent="318" name="Jan">
       <Position>12</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="386" parent="310" name="Feb">
+    <column id="500" parent="318" name="Feb">
       <Position>13</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="387" parent="310" name="Mar">
+    <column id="501" parent="318" name="Mar">
       <Position>14</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="388" parent="311" name="name">
+    <column id="502" parent="319" name="name">
       <Position>1</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="389" parent="311" name="Code">
+    <column id="503" parent="319" name="Code">
       <Position>2</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="390" parent="311" name="Ownership">
+    <column id="504" parent="319" name="Ownership">
       <Position>3</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="391" parent="311" name="Fuel_Type">
+    <column id="505" parent="319" name="Fuel_Type">
       <Position>4</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="392" parent="311" name="Rated_Capacity">
+    <column id="506" parent="319" name="Rated_Capacity">
       <Position>5</Position>
       <StoredType>double|0s</StoredType>
     </column>
-    <column id="393" parent="311" name="PAF">
+    <column id="507" parent="319" name="PAF">
       <Position>6</Position>
       <StoredType>double|0s</StoredType>
     </column>
-    <column id="394" parent="311" name="PLF">
+    <column id="508" parent="319" name="PLF">
       <Position>7</Position>
       <StoredType>double|0s</StoredType>
     </column>
-    <column id="395" parent="311" name="Aux_Consumption">
+    <column id="509" parent="319" name="Aux_Consumption">
       <Position>8</Position>
       <StoredType>double|0s</StoredType>
     </column>
-    <column id="396" parent="311" name="Variable_Cost">
+    <column id="510" parent="319" name="Variable_Cost">
       <Position>9</Position>
       <StoredType>double|0s</StoredType>
     </column>
-    <column id="397" parent="311" name="Type">
+    <column id="511" parent="319" name="Type">
       <Position>10</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="398" parent="311" name="Technical_Minimum">
+    <column id="512" parent="319" name="Technical_Minimum">
       <Position>11</Position>
       <StoredType>double|0s</StoredType>
     </column>
-    <column id="399" parent="311" name="Max_Power">
+    <column id="513" parent="319" name="Max_Power">
       <Position>12</Position>
       <StoredType>double|0s</StoredType>
     </column>
-    <column id="400" parent="311" name="Min_Power">
+    <column id="514" parent="319" name="Min_Power">
       <Position>13</Position>
       <StoredType>double|0s</StoredType>
     </column>
-    <column id="401" parent="312" name="id">
+    <column id="515" parent="320" name="id">
       <Position>1</Position>
       <StoredType>bigint|0s</StoredType>
     </column>
-    <column id="402" parent="312" name="user_id">
+    <column id="516" parent="320" name="user_id">
       <Position>2</Position>
       <StoredType>bigint|0s</StoredType>
     </column>
-    <column id="403" parent="312" name="token_hash">
+    <column id="517" parent="320" name="token_hash">
       <Position>3</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="404" parent="312" name="expires_at">
+    <column id="518" parent="320" name="expires_at">
       <Position>4</Position>
       <StoredType>datetime|0s</StoredType>
     </column>
-    <column id="405" parent="312" name="revoked">
+    <column id="519" parent="320" name="revoked">
       <Position>5</Position>
       <StoredType>bigint|0s</StoredType>
     </column>
-    <column id="406" parent="312" name="created_at">
+    <column id="520" parent="320" name="created_at">
       <Position>6</Position>
       <StoredType>datetime|0s</StoredType>
     </column>
-    <column id="407" parent="312" name="user_agent">
+    <column id="521" parent="320" name="user_agent">
       <Position>7</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="408" parent="312" name="ip">
+    <column id="522" parent="320" name="ip">
       <Position>8</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="409" parent="313" name="role_id">
+    <column id="523" parent="321" name="role_id">
       <Position>1</Position>
       <StoredType>bigint|0s</StoredType>
     </column>
-    <column id="410" parent="313" name="name">
+    <column id="524" parent="321" name="name">
       <Position>2</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="411" parent="314" name="user_id">
+    <column id="525" parent="322" name="user_id">
       <Position>1</Position>
       <StoredType>bigint|0s</StoredType>
     </column>
-    <column id="412" parent="314" name="role_id">
+    <column id="526" parent="322" name="role_id">
       <Position>2</Position>
       <StoredType>bigint|0s</StoredType>
     </column>
-    <column id="413" parent="315" name="user_id">
+    <column id="527" parent="323" name="user_id">
       <AutoIncrement>15</AutoIncrement>
       <NotNull>1</NotNull>
       <Position>1</Position>
       <StoredType>bigint|0s</StoredType>
     </column>
-    <column id="414" parent="315" name="email">
+    <column id="528" parent="323" name="email">
       <Position>2</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="415" parent="315" name="password_hash">
+    <column id="529" parent="323" name="password_hash">
       <Position>3</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="416" parent="315" name="full_name">
+    <column id="530" parent="323" name="full_name">
       <Position>4</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="417" parent="315" name="profile_photo">
+    <column id="531" parent="323" name="profile_photo">
       <Position>5</Position>
       <StoredType>text|0s</StoredType>
     </column>
-    <column id="418" parent="315" name="is_active">
+    <column id="532" parent="323" name="is_active">
       <Position>6</Position>
       <StoredType>bigint|0s</StoredType>
     </column>
-    <column id="419" parent="315" name="email_verified">
+    <column id="533" parent="323" name="email_verified">
       <Position>7</Position>
       <StoredType>bigint|0s</StoredType>
     </column>
-    <column id="420" parent="315" name="created_at">
+    <column id="534" parent="323" name="created_at">
       <Position>8</Position>
       <StoredType>datetime|0s</StoredType>
     </column>
-    <column id="421" parent="315" name="updated_at">
+    <column id="535" parent="323" name="updated_at">
       <Position>9</Position>
       <StoredType>datetime|0s</StoredType>
     </column>
-    <index id="422" parent="315" name="PRIMARY">
+    <index id="536" parent="323" name="PRIMARY">
       <ColNames>user_id</ColNames>
       <Type>btree</Type>
       <Unique>1</Unique>
     </index>
-    <key id="423" parent="315" name="PRIMARY">
+    <key id="537" parent="323" name="PRIMARY">
       <NameSurrogate>1</NameSurrogate>
       <Primary>1</Primary>
       <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>
