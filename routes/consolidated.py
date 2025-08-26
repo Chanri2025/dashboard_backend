@@ -1,10 +1,13 @@
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
-from pymongo import MongoClient, ASCENDING
+from pymongo import MongoClient, ASCENDING, DESCENDING
 from datetime import time, timedelta
 from dotenv import load_dotenv
+from bisect import bisect_left
+from collections import OrderedDict
 import os, math
-from Helpers.helpers import parse_start_timestamp
+
+from Helpers.helpers import parse_start_timestamp  # your existing helper
 
 router = APIRouter()
 load_dotenv()
@@ -16,35 +19,62 @@ power_db = client["power_casting_new"]
 # --- target collection for consolidated records ---
 bank_adj_coll = power_db["Banking-Adjust-consolidated"]
 
+# --- helpful compound indexes (create if missing, safe to call repeatedly) ---
+power_db["Plant_Generation"].create_index([("Timestamp", ASCENDING), ("VC", ASCENDING)])
+power_db["banking_data"].create_index([("Timestamp", ASCENDING)])
+power_db["Demand_Drawl"].create_index([("Timestamp", ASCENDING)])
+power_db["market_price_data"].create_index([("Timestamp", ASCENDING)])
+power_db["Battery_Status"].create_index([("Timestamp", ASCENDING)])
+
+# ---------- O(log n) prefix cache (LRU) ----------
+# Key: datetime timestamp; Value: dict with prefix arrays and plant lists
+_PREFIX_CACHE_MAX = 256
+_prefix_cache: OrderedDict = OrderedDict()  # timestamp -> {"vc":[], "bu":[], "cum_units":[], "cum_cost":[], "plants_asc":[], "plants_desc":[]}
+
+
+def _cache_put(ts, entry):
+    # Simple LRU
+    _prefix_cache[ts] = entry
+    _prefix_cache.move_to_end(ts)
+    if len(_prefix_cache) > _PREFIX_CACHE_MAX:
+        _prefix_cache.popitem(last=False)
+
+
+def _cache_get(ts):
+    if ts in _prefix_cache:
+        _prefix_cache.move_to_end(ts)
+        return _prefix_cache[ts]
+    return None
+
 
 # ---------- Helpers ----------
-def calculate_weighted_average_for_quantum(plants, quantum):
-    used_units = 0.0
-    total_cost = 0.0
-    total_units = 0.0
-    updated_plants = []
+def calculate_weighted_average_for_quantum_prefix(q, ts):
+    """
+    O(log n) cost computation using prefix sums (cheapest-first order).
+    Returns (weighted_avg, total_cost, total_units==q).
+    """
+    cached = _cache_get(ts)
+    if not cached:
+        raise LookupError("Prefix cache not prepared for timestamp")
 
-    for plant in sorted(plants, key=lambda x: x['VC'], reverse=False):
-        available = plant.get('backdown_units', 0.0)
-        vc = plant.get('VC', 0.0)
+    vc = cached["vc"]
+    cum_units = cached["cum_units"]
+    cum_cost = cached["cum_cost"]
 
-        if used_units >= quantum:
-            plant['used_for_quantum'] = 0.0
-            updated_plants.append(plant)
-            continue
+    if q <= 0:
+        return 0.0, 0.0, 0.0
 
-        use = min(quantum - used_units, available)
-        cost = use * vc
+    k = bisect_left(cum_units, q)  # first idx where cum_units[idx] >= q
+    if k == 0:
+        total_cost = q * vc[0]
+    else:
+        full_units = cum_units[k - 1]
+        full_cost = cum_cost[k - 1]
+        partial = q - full_units
+        total_cost = full_cost + partial * vc[k]
 
-        used_units += use
-        total_cost += cost
-        total_units += use
-
-        plant['used_for_quantum'] = use
-        updated_plants.append(plant)
-
-    weighted_avg = round(total_cost / total_units, 2) if total_units > 0 else 0.0
-    return weighted_avg, round(total_cost, 2), round(total_units, 2), updated_plants
+    weighted_avg = round(total_cost / q, 2)
+    return weighted_avg, round(total_cost, 2), round(q, 2)
 
 
 def in_dsm_window(ts):
@@ -61,30 +91,6 @@ def fetch_banking_row(ts):
     if math.isnan(bu): bu = 0.0
     if math.isnan(au): au = 0.0
     return bu, au
-
-
-def fetch_plants(ts):
-    cursor = power_db["Plant_Generation"].find(
-        {"Timestamp": ts}, {"_id": 0, "Plant_Name": 1, "DC": 1, "SG": 1, "VC": 1}
-    )
-    plants = []
-    for p in cursor:
-        dc = 0.0 if math.isnan(p.get("DC", 0.0) or 0.0) else (p.get("DC", 0.0) or 0.0)
-        sg = 0.0 if math.isnan(p.get("SG", 0.0) or 0.0) else (p.get("SG", 0.0) or 0.0)
-        vc = round(0.0 if math.isnan(p.get("VC", 0.0) or 0.0) else (p.get("VC", 0.0) or 0.0), 2)
-
-        bd_units = round(((dc - sg) * 1000 * 0.25) if dc > sg else 0.0, 2)
-        bd_cost = round(bd_units * vc if not math.isnan(bd_units * vc) else 0.0, 2)
-
-        plants.append({
-            "Plant_Name": p.get("Plant_Name"),
-            "DC": dc, "SG": sg, "VC": vc,
-            "backdown_units": bd_units,
-            "backdown_cost": bd_cost
-        })
-    # Keep a copy sorted by VC for MOD
-    plants_by_vc = sorted(plants, key=lambda r: r["VC"], reverse=True)
-    return plants, plants_by_vc
 
 
 def fetch_demand_drawl(ts):
@@ -110,32 +116,97 @@ def fetch_market_prices(ts):
     return dam, rtm, mp
 
 
+def fetch_plants_prepare_prefix(ts):
+    """
+    Fetch plants for timestamp ts with Mongo server-side sort by VC ASC (cheapest-first),
+    compute backdown_units/cost, build prefix sums, and cache both ASC + DESC lists.
+    """
+    cursor = power_db["Plant_Generation"].find(
+        {"Timestamp": ts},
+        {"_id": 0, "Plant_Name": 1, "DC": 1, "SG": 1, "VC": 1}
+    ).sort("VC", ASCENDING)
+
+    plants_asc = []
+    for p in cursor:
+        dc_raw = p.get("DC", 0.0)
+        sg_raw = p.get("SG", 0.0)
+        vc_raw = p.get("VC", 0.0)
+
+        dc = 0.0 if math.isnan(dc_raw or 0.0) else (dc_raw or 0.0)
+        sg = 0.0 if math.isnan(sg_raw or 0.0) else (sg_raw or 0.0)
+        vc = round(0.0 if math.isnan(vc_raw or 0.0) else (vc_raw or 0.0), 2)
+
+        bd_units = round(((dc - sg) * 1000 * 0.25) if dc > sg else 0.0, 2)
+        bd_cost = round(bd_units * vc if not math.isnan(bd_units * vc) else 0.0, 2)
+
+        plants_asc.append({
+            "Plant_Name": p.get("Plant_Name"),
+            "DC": dc, "SG": sg, "VC": vc,
+            "backdown_units": bd_units,
+            "backdown_cost": bd_cost
+        })
+
+    if not plants_asc:
+        return [], []  # nothing; let caller handle
+
+    # Prepare prefix sums over ASC (cheapest-first)
+    vc = [row["VC"] for row in plants_asc]
+    bu = [row["backdown_units"] for row in plants_asc]
+    cum_units, cum_cost = [], []
+    u = c = 0.0
+    for i in range(len(plants_asc)):
+        u += bu[i]
+        c += bu[i] * vc[i]
+        cum_units.append(round(u, 6))
+        cum_cost.append(round(c, 6))
+
+    plants_desc = list(reversed(plants_asc))  # for response/MOD (VC desc)
+
+    _cache_put(ts, {
+        "vc": vc,
+        "bu": bu,
+        "cum_units": cum_units,
+        "cum_cost": cum_cost,
+        "plants_asc": plants_asc,
+        "plants_desc": plants_desc
+    })
+
+    return plants_asc, plants_desc
+
+
+def compute_totals(plants_list):
+    t_units = round(sum(p["backdown_units"] for p in plants_list), 2)
+    t_cost = round(sum(p["backdown_cost"] for p in plants_list), 2)
+    wav = round((t_cost / t_units), 2) if t_units > 0 else 0.0
+    # MOD (max VC) is first element of DESC or last of ASC; caller ensures DESC
+    mod = round(plants_list[0]["VC"], 2) if plants_list else 0.0
+    return t_units, t_cost, wav, mod
+
+
 def fetch_battery_status(ts):
-    # Always fetch the most recent record strictly before ts
+    """
+    Strictly before ts; if none, initialize synthetic 'previous block' document.
+    """
     doc = power_db["Battery_Status"].find_one(
         {"Timestamp": {"$lt": ts}},
-        sort=[("Timestamp", -1)]
+        sort=[("Timestamp", DESCENDING)]
     )
-
     if not doc:
-        # initialize with default if nothing found
         doc = {
-            "Timestamp": ts - timedelta(minutes=15),  # previous block
+            "Timestamp": ts - timedelta(minutes=15),
             "Units_Available": 2823529.412,
             "Cycle": "NO_CHARGE"
         }
-
     return doc
 
 
 def upsert_battery_status(ts, qty, cycle, *, capacity_limit=None):
     """
-    qty: the energy amount for this action (positive).
-    Units_Available = free capacity to accept charge (headroom).
-      - CHARGE: consume headroom -> headroom -= qty
-      - USE   : free headroom    -> headroom += qty
-      - else  : unchanged
-    capacity_limit: optional maximum headroom, if you model total capacity.
+    qty: positive energy amount for this action.
+    Units_Available = free capacity/headroom.
+      - CHARGE: headroom -= qty
+      - USE   : headroom += qty
+      - NO_CHARGE: unchanged
     """
     prev = fetch_battery_status(ts)
     headroom = float(prev.get("Units_Available", 0.0) or 0.0)
@@ -145,8 +216,10 @@ def upsert_battery_status(ts, qty, cycle, *, capacity_limit=None):
     elif cycle == "USE":
         headroom = headroom + qty
     else:
-        # NO_CHARGE or anything else -> no change
         pass
+
+    if capacity_limit is not None:
+        headroom = min(headroom, capacity_limit)
 
     headroom = round(headroom, 3)
     power_db["Battery_Status"].update_one(
@@ -156,25 +229,49 @@ def upsert_battery_status(ts, qty, cycle, *, capacity_limit=None):
     )
 
 
-# ---------- Core calc ----------
-def compute_totals(plants, plants_by_vc):
-    t_units = round(sum(p["backdown_units"] for p in plants), 2)
-    t_cost = round(sum(p["backdown_cost"] for p in plants), 2)
-    wav = round((t_cost / t_units), 2) if t_units > 0 else 0.0
-    mod = round(plants_by_vc[0]["VC"], 2) if plants_by_vc else 0.0
-    return t_units, t_cost, wav, mod
+def allocate_used_for_quantum_desc(ts, quantum):
+    """
+    Populate used_for_quantum per-plant (single O(n) pass) and return list sorted by VC DESC.
+    Uses cached plants ASC, fills usage cheapest-first, then returns DESC for response.
+    """
+    cached = _cache_get(ts)
+    if not cached:
+        raise LookupError("Prefix cache not prepared for timestamp")
+
+    # Work on a copy to not mutate cache
+    plants_asc = [dict(p) for p in cached["plants_asc"]]
+    remaining = max(0.0, float(quantum or 0.0))
+    for p in plants_asc:
+        avail = p.get("backdown_units", 0.0) or 0.0
+        use = min(avail, remaining)
+        p["used_for_quantum"] = round(use, 3)
+        remaining -= use
+        if remaining <= 0:
+            # Fill zeros for the rest if any
+            pass
+    # Return DESC order
+    plants_desc = list(reversed(plants_asc))
+    return plants_desc
 
 
-def decide_banking(timestamp, banked_units, scheduled_generation, drawl, weighted_average, mod, dam, rtm,
-                   market_purchase,
-                   total_backdown_units, total_backdown_cost, units_available_before, plants_by_vc):
+def decide_banking(timestamp, banked_units, scheduled_generation, drawl,
+                   weighted_average_mod, mod, dam, rtm,
+                   market_purchase_input,
+                   total_backdown_units, total_backdown_cost,
+                   units_available_before):
+    """
+    Uses O(log n) prefix sums to compute weighted average costs.
+    Also returns plants_with_usage (DESC) for the response.
+    """
     s_d = max(scheduled_generation - drawl, 0.0)  # schedule surplus
     units_after = units_available_before
     banking_cost = 0.0
-    market_purchase = 0
+    market_purchase = 0.0
     dsm_units = 0.0
-    weighted_average = weighted_average
     cycle = "NO_CHARGE"
+
+    # default plants_with_usage = zeros allocated (but DESC sorted for response)
+    plants_with_usage = allocate_used_for_quantum_desc(timestamp, 0.0)
 
     if banked_units <= 0:
         upsert_battery_status(timestamp, 0, cycle)
@@ -183,70 +280,85 @@ def decide_banking(timestamp, banked_units, scheduled_generation, drawl, weighte
             "DSM_units": 0.0,
             "cycle": cycle,
             "units_available_after": units_available_before,
-            "weighted_average": round(weighted_average, 2),
-            "market_purchase": 0
+            "weighted_average": round(weighted_average_mod, 2),
+            "market_purchase": 0.0,
+            "plants_with_usage": plants_with_usage
         }
-    else:
-        if s_d > 0:
-            if s_d >= banked_units:
-                if not in_dsm_window(timestamp):
-                    cycle = "CHARGE"
-                    banking_cost = 0.0
-                    if units_after == 0:  # added the banked unit will go to DSM
-                        dsm_units = banked_units
-                        upsert_battery_status(timestamp, 0, cycle)
-                    elif units_available_before > banked_units:  # added the banked unit will go to battery
-                        dsm_units = 0
-                        upsert_battery_status(timestamp, banked_units, cycle)
-                        units_after = units_available_before - banked_units
-                    else:
-                        dsm_units = banked_units - units_available_before  # partial DSM Discharge
-                        upsert_battery_status(timestamp, units_available_before, cycle)
-                        units_after = 0
-                else:
-                    # dsm all banked units
-                    dsm_units = banked_units
-                    cycle = "NO_CHARGE"
-                    banking_cost = 0.0  # cost stays 0
-                    upsert_battery_status(timestamp, banked_units, cycle)
-            else:
-                # s_d consumes part, rest are "balanced_units"
-                balanced_units = round(banked_units - s_d, 3)
-                cycle = "NO_CHARGE"
-                # your original logic for pricing balanced_units:
-                weighted_average, total_backdown_cost, total_backdown_units, updated_plants = calculate_weighted_average_for_quantum(
-                    plants_by_vc, banked_units)
-                banking_cost = round(total_backdown_cost, 2)
-                if balanced_units >= total_backdown_units:
-                    # Banking cost is total backdown cost + extra-unit which is purchased from market
-                    market_purchase = balanced_units - total_backdown_units
-                    banking_cost = round(total_backdown_cost + market_purchase * min(dam, rtm), 2)
-                upsert_battery_status(timestamp, banked_units, cycle)
-        else:
-            # sg <= drawl (no surplus)
-            if total_backdown_units < banked_units:
-                # If backdown units are less than banked units, total_backdown cost will be taken and remaining units will be purchased from market
-                cycle = "NO_CHARGE"
-                upsert_battery_status(timestamp, banked_units, cycle)
-                market_purchase = banked_units - total_backdown_units
-                banking_cost = round(total_backdown_cost + market_purchase * min(dam, rtm), 2)
-            else:
-                # If backdown units are greater than banked units, total_backdown quantity will be used to adjust the battery banking units
-                cycle = "NO_CHARGE"
-                upsert_battery_status(timestamp, banked_units, cycle)
-                # weighted average cost will be used to change the banking cost
-                weighted_average, total_backdown_cost, total_backdown_units, updated_plants = calculate_weighted_average_for_quantum(
-                    plants_by_vc, banked_units)
-                banking_cost = round(weighted_average * banked_units, 2)
 
-        return {
-            "banking_cost": round(banking_cost, 2),
-            "DSM_units": round(dsm_units, 2),
-            "cycle": cycle,
-            "units_available_after": round(units_after, 3),
-            "weighted_average": round(weighted_average, 2),
-            "market_purchase": round(market_purchase, 2)
-        }
+    if s_d > 0:
+        if s_d >= banked_units:
+            if not in_dsm_window(timestamp):
+                cycle = "CHARGE"
+                banking_cost = 0.0
+                if units_after == 0:
+                    # all go to DSM (nothing to charge)
+                    dsm_units = banked_units
+                    upsert_battery_status(timestamp, 0, cycle)
+                elif units_available_before > banked_units:
+                    # all banked_units go to battery
+                    dsm_units = 0.0
+                    upsert_battery_status(timestamp, banked_units, cycle)
+                    units_after = units_available_before - banked_units
+                else:
+                    # partial: some go to battery, rest to DSM
+                    dsm_units = banked_units - units_available_before
+                    upsert_battery_status(timestamp, units_available_before, cycle)
+                    units_after = 0.0
+            else:
+                # DSM all banked units during DSM window
+                dsm_units = banked_units
+                cycle = "NO_CHARGE"
+                banking_cost = 0.0
+                upsert_battery_status(timestamp, banked_units, cycle)
+            # for display, allocation is not actually used here; keep zeros
+        else:
+            # s_d consumes part; remaining are "balanced_units"
+            balanced_units = round(banked_units - s_d, 3)
+            cycle = "NO_CHARGE"
+            # O(log n) weighted average using prefix
+            wavg, tot_bd_cost_for_balanced, total_units_used = calculate_weighted_average_for_quantum_prefix(
+                balanced_units, timestamp
+            )
+            banking_cost = round(tot_bd_cost_for_balanced, 2)
+            total_backdown_units_used = total_units_used
+
+            if balanced_units >= total_backdown_units_used:
+                # Extra from market
+                market_purchase = balanced_units - total_backdown_units_used
+                banking_cost = round(tot_bd_cost_for_balanced + market_purchase * min(dam, rtm), 2)
+
+            upsert_battery_status(timestamp, banked_units, cycle)
+            # Provide per-plant usage for the entire banked_units (for UI visibility)
+            plants_with_usage = allocate_used_for_quantum_desc(timestamp, balanced_units)
+            weighted_average_mod = wavg
+    else:
+        # No surplus: sg <= drawl
+        if total_backdown_units < banked_units:
+            # Need market purchase for the shortfall
+            cycle = "NO_CHARGE"
+            upsert_battery_status(timestamp, banked_units, cycle)
+            market_purchase = banked_units - total_backdown_units
+            # total_backdown_cost corresponds to using all available backdown
+            banking_cost = round(total_backdown_cost + market_purchase * min(dam, rtm), 2)
+            plants_with_usage = allocate_used_for_quantum_desc(timestamp, total_backdown_units)
+        else:
+            # Sufficient backdown available; cost is weighted average * banked_units
+            cycle = "NO_CHARGE"
+            upsert_battery_status(timestamp, banked_units, cycle)
+            wavg, tot_cost, _ = calculate_weighted_average_for_quantum_prefix(banked_units, timestamp)
+            banking_cost = round(wavg * banked_units, 2)
+            weighted_average_mod = wavg
+            plants_with_usage = allocate_used_for_quantum_desc(timestamp, banked_units)
+
+    return {
+        "banking_cost": round(banking_cost, 2),
+        "DSM_units": round(dsm_units, 2),
+        "cycle": cycle,
+        "units_available_after": round(units_after, 3),
+        "weighted_average": round(weighted_average_mod, 2),
+        "market_purchase": round(market_purchase, 2),
+        "plants_with_usage": plants_with_usage
+    }
 
 
 def compute_adjustment(timestamp, adjusted_units, mod, dam, rtm,
@@ -262,7 +374,6 @@ def compute_adjustment(timestamp, adjusted_units, mod, dam, rtm,
     if units_before > 0:
         battery_units = battery_units - units_before
 
-    # If there is no Adjusted Units
     if adjusted_units <= 0:
         return {
             "adjustment_charges": 0.0,
@@ -272,67 +383,75 @@ def compute_adjustment(timestamp, adjusted_units, mod, dam, rtm,
             "highest_rate": highest_rate,
             "battery_charge_rate": 4.0
         }
-    else:
-        if in_dsm_window(timestamp):
-            if adjusted_units < battery_units:
-                adj_cost = round(adjusted_units * battery_charge_rate, 2)
-                # this means that unit will be deducted from battery
-                cycle = "USE"
-                upsert_battery_status(timestamp, adjusted_units, cycle)
-                units_before = adjusted_units + units_before
-            else:
-                # if enough units not available for deduction from battery
-                balance_units = adjusted_units - battery_units
-                cycle = "USE"
-                upsert_battery_status(timestamp, battery_units, cycle)
-                adj_cost = battery_units * battery_charge_rate + balance_units * highest_rate
-                units_before = battery_units + units_before  # Battery Units Available
 
-        else:
-            adj_cost = round(adjusted_units * highest_rate, 2)
-            cycle = "NO_CHARGE"
+    if in_dsm_window(timestamp):
+        if adjusted_units < battery_units:
+            adj_cost = round(adjusted_units * battery_charge_rate, 2)
+            cycle = "USE"
             upsert_battery_status(timestamp, adjusted_units, cycle)
+            units_before = adjusted_units + units_before
+            battery_used = adjusted_units
+        else:
+            balance_units = adjusted_units - battery_units
+            cycle = "USE"
+            upsert_battery_status(timestamp, battery_units, cycle)
+            adj_cost = battery_units * battery_charge_rate + balance_units * highest_rate
+            units_before = battery_units + units_before
+            battery_used = battery_units
+    else:
+        adj_cost = round(adjusted_units * highest_rate, 2)
+        cycle = "NO_CHARGE"
+        upsert_battery_status(timestamp, adjusted_units, cycle)
 
-        return {
-            "adjustment_charges": adj_cost,
-            "battery_used": round(battery_used, 3),
-            "balance_units": round(balance_units, 3),
-            "units_available_after": round(units_before, 3),
-            "highest_rate": highest_rate,
-            "battery_charge_rate": 4.0
-        }
+    return {
+        "adjustment_charges": round(adj_cost, 2),
+        "battery_used": round(battery_used, 3),
+        "balance_units": round(balance_units, 3),
+        "units_available_after": round(units_before, 3),
+        "highest_rate": highest_rate,
+        "battery_charge_rate": 4.0
+    }
 
 
 # --- FastAPI route ---
 @router.get("/calculate")
 async def calculate_consolidated(start_date: str = Query(..., alias="start_date")):
+    # Parse timestamp
     try:
         timestamp = parse_start_timestamp(start_date)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    # Fetch & prepare (includes prefix caching and both ASC/DESC lists)
+    plants_asc, plants_desc = fetch_plants_prepare_prefix(timestamp)
+
     try:
         banked_units, adjusted_units = fetch_banking_row(timestamp)
-        plants, plants_by_vc = fetch_plants(timestamp)
         scheduled_generation, drawl = fetch_demand_drawl(timestamp)
-        dam, rtm, market_purchase = fetch_market_prices(timestamp)
+        dam, rtm, market_purchase_in = fetch_market_prices(timestamp)
         battery_details = fetch_battery_status(timestamp)
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
-    total_backdown_units, total_backdown_cost, weighted_average, mod = compute_totals(plants, plants_by_vc)
+    # Totals on DESC (for MOD, etc.)
+    total_backdown_units, total_backdown_cost, weighted_average_base, mod = compute_totals(plants_desc)
     units_left_to_charge = float(battery_details.get("Units_Available", 0.0) or 0.0)
 
+    # Banking + allocation
     bank = decide_banking(
         timestamp, banked_units, scheduled_generation, drawl,
-        weighted_average, mod, dam, rtm, market_purchase,
+        weighted_average_base, mod, dam, rtm, market_purchase_in,
         total_backdown_units, total_backdown_cost,
-        units_left_to_charge, plants_by_vc
+        units_left_to_charge
     )
 
+    # Adjustment
     adj = compute_adjustment(
         timestamp, adjusted_units, mod, dam, rtm,
     )
+
+    # Always return plant_backdown_data sorted by VC Ascending (with used_for_quantum present)
+    plant_rows_asc = sorted(bank.get("plants_with_usage") or plants_desc, key=lambda r: r["VC"])
 
     result = {
         "Timestamp": timestamp.strftime("%Y-%m-%d %H:%M"),
@@ -344,10 +463,10 @@ async def calculate_consolidated(start_date: str = Query(..., alias="start_date"
         "dam_rate": round(dam, 2),
         "rtm_rate": round(rtm, 2),
 
-        "plant_backdown_data": sorted(plants, key=lambda r: r["VC"]),
+        "plant_backdown_data": plant_rows_asc,
         "total_backdown_units": round(total_backdown_units, 3),
         "total_backdown_cost": round(total_backdown_cost, 2),
-        "weighted_avg_rate": round(bank["weighted_average"], 2),
+        "weighted_avg_rate": bank["weighted_average"],
         "MOD_rate": mod,
         "highest_rate": max(mod, dam, rtm),
 

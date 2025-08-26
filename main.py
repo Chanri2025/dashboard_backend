@@ -30,6 +30,7 @@ from routes.power_theft import router as power_theft_router
 from routes.procurement import router as procurement_router
 from routes.region import router as region_router
 from routes.substation import router as substation_router
+from routes.consumption import router as consumption_router
 
 load_dotenv()
 
@@ -110,6 +111,7 @@ app.include_router(availability_router, prefix="/availability", tags=["Availabil
 app.include_router(backdown_router, prefix="/backdown", tags=["Backdown"])
 app.include_router(consolidated_router, prefix="/consolidated-part", tags=["Consolidated"])
 app.include_router(consumer_router, prefix="/consumer", tags=["Consumer"])
+app.include_router(consumption_router, prefix="/consumer", tags=["Consumer"])
 app.include_router(demand_router, prefix="/demand", tags=["Demand"])
 app.include_router(dtr_router, prefix="/dtr", tags=["DTR"])
 app.include_router(feeder_router, prefix="/feeder", tags=["Feeder"])

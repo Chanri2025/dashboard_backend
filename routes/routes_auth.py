@@ -5,13 +5,13 @@ from sqlalchemy import func
 import datetime as dt
 import hashlib
 
-from auth.deps import get_db, get_current_user, require_roles
-from auth.models import User, Role, RefreshToken
-from auth.schemas import (
+from Helpers.deps import get_db, get_current_user, require_roles
+from Models.auth_models import User, Role, RefreshToken
+from Schemas.auth_schemas import (
     RegisterIn, LoginIn, TokenOut, UserWithRole, AssignRolesIn,
     UpdatePhotoIn, ChangePasswordIn
 )
-from auth.security import (
+from utils.security import (
     hash_password, verify_password, create_access_token,
     make_refresh_token, refresh_exp
 )
