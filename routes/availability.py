@@ -42,7 +42,7 @@ def get_availability():
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM PAF_Details")
+        cursor.execute("SELECT * FROM paf_details")
         return cursor.fetchall()
     finally:
         cursor.close()
