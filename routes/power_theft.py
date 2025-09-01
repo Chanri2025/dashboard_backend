@@ -167,7 +167,7 @@ def diagnose_blocks(
     overuse_margin: float = Query(default=0.15, ge=0.0, le=1.0)
 ):
     db = get_db()
-    coll = db["Consumer_Consumption"]
+    coll = db["Consumer_consumption"]
 
     # Build query
     query: Dict[str, Any] = {}
