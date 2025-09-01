@@ -104,3 +104,21 @@ def get_demand_data(start_date: str = Query(...), end_date: str = Query(...)):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+@router.get("/all")
+def get_all_demand_data():
+    try:
+        cursor = db["Demand"].find({}, {"_id": 0}).sort("TimeStamp", 1)
+
+        raw_docs = list(cursor)
+        clean_docs = []
+        for doc in raw_docs:
+            doc = convert_decimal128(doc)
+            ts = doc.get("TimeStamp")
+            if isinstance(ts, datetime):
+                doc["TimeStamp"] = ts.strftime("%Y-%m-%d %H:%M:%S")
+            clean_docs.append(doc)
+
+        return clean_docs
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

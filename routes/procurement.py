@@ -421,3 +421,76 @@ def get_MOD(
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/summary", response_class=JSONResponse, description="Block-wise summary from Demand_Output")
+def get_summary(
+        start_date: str = Query(..., description="Accepts 'YYYY-MM-DD', 'YYYY-MM-DD HH:MM', or 'YYYY-MM-DD HH:MM:SS'"),
+        end_date: str = Query(..., description="Accepts 'YYYY-MM-DD', 'YYYY-MM-DD HH:MM', or 'YYYY-MM-DD HH:MM:SS'")
+):
+    try:
+        start_dt = du.parse_start_timestamp(start_date)
+        end_dt = du.parse_start_timestamp(end_date)
+
+        if start_dt > end_dt:
+            raise HTTPException(status_code=400, detail="start_date must be <= end_date")
+
+        projection = {
+            "_id": 0,
+            "TimeStamp": 1,
+            "Demand_Banked": 1,
+            "Demand(Actual)": 1,
+            "Must_Run_Total_Gen": 1,
+            "Must_Run_Total_Cost": 1,
+            "IEX_Gen": 1,
+            "IEX_Cost": 1,
+            "Remaining_Plants_Total_Gen": 1,
+            "Remaining_Plants_Total_Cost": 1,
+            "Last_Price": 1,
+            "Backdown_Cost": 1,
+            "Backdown_Unit": 1,
+            "Banking_Unit": 1,
+        }
+
+        cursor = DemandOutput.find(
+            {"TimeStamp": {"$gte": start_dt, "$lte": end_dt}},
+            projection
+        ).sort("TimeStamp", 1)
+
+        def _coerce_numeric(v):
+            try:
+                return to_float(v)
+            except Exception:
+                return v
+
+        results: List[Dict[str, Any]] = []
+        for doc in cursor:
+            clean: Dict[str, Any] = {}
+
+            # 1) Handle TimeStamp first (no numeric coercion)
+            ts = doc.get("TimeStamp")
+            if isinstance(ts, datetime):
+                clean["TimeStamp"] = ts.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                # keep as-is if already string/number (but ideally it's a datetime)
+                clean["TimeStamp"] = ts
+
+            # 2) Coerce other numeric fields
+            for k, v in doc.items():
+                if k == "TimeStamp":
+                    continue
+                try:
+                    clean[k] = to_float(v)
+                except Exception:
+                    clean[k] = v
+
+            results.append(clean)
+
+        return JSONResponse(content={"summary": results}, status_code=200)
+
+    except HTTPException:
+        raise
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

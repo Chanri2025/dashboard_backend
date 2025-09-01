@@ -2,6 +2,7 @@
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import os
+import logging
 
 from fastapi import APIRouter, HTTPException, Query, Depends, status
 from pymongo import MongoClient
@@ -29,6 +30,130 @@ MONGO_URI = os.getenv("MONGO_URI")
 # ───────────────────────── ROUTERS ─────────────────────────
 # Keep them separate to avoid any path conflicts.
 router = APIRouter()
+
+# ───────────────────────── LOGGING / SANITIZATION ─────────────────────────
+logger = logging.getLogger(__name__)
+
+# hard limits from your Pydantic schema
+VOLTS_MIN, VOLTS_MAX = 1, 1000  # conint(gt=0, le=1000)
+SANCTION_MIN = 1  # conint(gt=0)
+OA_MIN = 0  # conint(ge=0)
+
+REQUIRED_FALLBACK = "UNKNOWN"  # fallback for required strings if DB row is dirty
+
+
+def _row_to_dict(row) -> Dict[str, Any]:
+    """Convert a SQLAlchemy model instance to a plain dict (excluding SQLA internals)."""
+    return {k: v for k, v in row.__dict__.items() if not k.startswith("_")}
+
+
+def _as_int(v: Any) -> Optional[int]:
+    """Best-effort parse to int; returns None on failure."""
+    try:
+        if isinstance(v, bool):
+            return None
+        if isinstance(v, int):
+            return v
+        if isinstance(v, float):
+            return int(v)
+        if isinstance(v, str):
+            v = v.strip()
+            if v == "":
+                return None
+            # accept "66", "66.0"
+            return int(float(v))
+    except Exception:
+        return None
+    return None
+
+
+def _clamp(n: int, lo: int, hi: int) -> int:
+    return max(lo, min(hi, n))
+
+
+def _sanitize_required_str(s: Any, max_len: int) -> str:
+    """Ensure a non-empty string for required text fields; fallback to 'UNKNOWN'."""
+    if s is None:
+        return REQUIRED_FALLBACK
+    s = str(s).strip()
+    if not s:
+        return REQUIRED_FALLBACK
+    return s[:max_len]
+
+
+def _sanitize_consumer_payload(d: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Conform DB row to Pydantic schema constraints so response_model validation passes.
+    - voltage_kv: int, gt 0, le 1000
+    - sanction_load_kw: int, gt 0
+    - oa_capacity_kw: int, ge 0
+    - required strings: ensure non-empty
+    """
+    changed = False
+
+    # Integers with bounds
+    v_int = _as_int(d.get("voltage_kv"))
+    if v_int is None or v_int <= 0:
+        v_new = VOLTS_MIN
+    else:
+        v_new = _clamp(v_int, VOLTS_MIN, VOLTS_MAX)
+    if v_new != d.get("voltage_kv"):
+        d["voltage_kv"] = v_new
+        changed = True
+
+    s_int = _as_int(d.get("sanction_load_kw"))
+    if s_int is None or s_int <= 0:
+        s_new = SANCTION_MIN
+    else:
+        s_new = max(SANCTION_MIN, s_int)
+    if s_new != d.get("sanction_load_kw"):
+        d["sanction_load_kw"] = s_new
+        changed = True
+
+    oa_int = _as_int(d.get("oa_capacity_kw"))
+    if oa_int is None or oa_int < 0:
+        oa_new = OA_MIN
+    else:
+        oa_new = max(OA_MIN, oa_int)
+    if oa_new != d.get("oa_capacity_kw"):
+        d["oa_capacity_kw"] = oa_new
+        changed = True
+
+    # Required strings in schema (min_length=1): consumer_id, circle, division, consumer_type
+    # Also trim to their respective max lengths defined in your schema
+    # consumer_id: max 50
+    cid = d.get("consumer_id")
+    cid_new = _sanitize_required_str(cid, 50)
+    if cid_new != cid:
+        d["consumer_id"] = cid_new
+        changed = True
+
+    # circle: max 100
+    circle = d.get("circle")
+    circle_new = _sanitize_required_str(circle, 100)
+    if circle_new != circle:
+        d["circle"] = circle_new
+        changed = True
+
+    # division: max 150
+    division = d.get("division")
+    division_new = _sanitize_required_str(division, 150)
+    if division_new != division:
+        d["division"] = division_new
+        changed = True
+
+    # consumer_type: max 50
+    ctype = d.get("consumer_type")
+    ctype_new = _sanitize_required_str(ctype, 50)
+    if ctype_new != ctype:
+        d["consumer_type"] = ctype_new
+        changed = True
+
+    if changed:
+        ident = d.get("id") or d.get("consumer_id") or "<unknown>"
+        logger.info(f"[consumer_sanitize] Coerced row {ident} to satisfy response schema")
+
+    return d
 
 
 # =========================================================================================
@@ -114,7 +239,7 @@ def get_consolidated_consumption(
                     "timestamp": iso_ts,
                     "consumption_kwh": d.get("Energy_consumption_kWh", 0.0),
                     "injection_kwh": None,
-                    "theoretical_kwh": d.get("Theoretical_kWh"),
+                    "theoretical_kwh": d.get("Theoretical_KWh") if "Theoretical_KWh" in d else d.get("Theoretical_kWh"),
                     "dtr_id": d.get("Dtr_id"),
                 }
             )
@@ -194,7 +319,10 @@ def create_consumer(payload: ConsumerDetailsCreate, db: Session = Depends(get_db
     db.add(obj)
     db.commit()
     db.refresh(obj)
-    return obj
+
+    d = _row_to_dict(obj)
+    d = _sanitize_consumer_payload(d)
+    return d
 
 
 @router.get("/", response_model=List[ConsumerDetailsOut])
@@ -217,7 +345,13 @@ def list_consumers(
             )
         )
     rows = db.execute(stmt.offset(skip).limit(limit)).scalars().all()
-    return rows
+
+    sanitized: List[Dict[str, Any]] = []
+    for r in rows:
+        d = _row_to_dict(r)
+        d = _sanitize_consumer_payload(d)
+        sanitized.append(d)
+    return sanitized
 
 
 @router.get("/{id:int}", response_model=ConsumerDetailsOut)
@@ -225,7 +359,9 @@ def get_consumer(id: int, db: Session = Depends(get_db)):
     obj = db.get(ConsumerDetails, id)
     if not obj:
         raise HTTPException(status_code=404, detail="Not found")
-    return obj
+    d = _row_to_dict(obj)
+    d = _sanitize_consumer_payload(d)
+    return d
 
 
 @router.get("/by-code/{consumer_id}", response_model=ConsumerDetailsOut)
@@ -235,7 +371,9 @@ def get_consumer_by_code(consumer_id: str, db: Session = Depends(get_db)):
     ).scalar_one_or_none()
     if not obj:
         raise HTTPException(status_code=404, detail="Not found")
-    return obj
+    d = _row_to_dict(obj)
+    d = _sanitize_consumer_payload(d)
+    return d
 
 
 @router.put("/{id:int}", response_model=ConsumerDetailsOut)
@@ -250,7 +388,9 @@ def update_consumer(id: int, payload: ConsumerDetailsUpdate, db: Session = Depen
     db.add(obj)
     db.commit()
     db.refresh(obj)
-    return obj
+    d = _row_to_dict(obj)
+    d = _sanitize_consumer_payload(d)
+    return d
 
 
 @router.delete("/{id:int}", status_code=status.HTTP_204_NO_CONTENT)
