@@ -22,7 +22,7 @@
       <load-sources>user_and_system_sources</load-sources>
     </data-source>
     <data-source name="@147.93.106.173 [2]" uuid="5f89886b-f255-440c-8ddb-b45da6092c55">
-      <database-info product="Mongo DB" version="6.0.25" jdbc-version="4.2" driver-name="MongoDB JDBC Driver" driver-version="1.20" dbms="MONGO" exact-version="6.0.25" exact-driver-version="1.20" />
+      <database-info product="Mongo DB" version="6.0.26" jdbc-version="4.2" driver-name="MongoDB JDBC Driver" driver-version="1.20" dbms="MONGO" exact-version="6.0.26" exact-driver-version="1.20" />
       <case-sensitivity plain-identifiers="mixed" quoted-identifiers="mixed" />
       <secret-storage>master_key</secret-storage>
       <user-name>DMMPrice</user-name>

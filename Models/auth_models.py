@@ -37,13 +37,12 @@ class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     user_id = Column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
-    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)  # 64-char SHA256 hex
     expires_at = Column(DateTime, nullable=False)
     revoked = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     user_agent = Column(String(255))
     ip = Column(String(45))
-    # optional convenience:
     user = relationship("User", backref="refresh_tokens")
 
 

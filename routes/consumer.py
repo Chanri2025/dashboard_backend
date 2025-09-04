@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Query, Depends, status
 from pymongo import MongoClient
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
-from sqlalchemy import select, or_, func
+from sqlalchemy import select, or_, func, literal, text
 
 # --- helpers ---
 from utils.date_utils import parse_start_timestamp, parse_end_timestamp
@@ -162,6 +162,13 @@ def _sanitize_consumer_payload(d: Dict[str, Any]) -> Dict[str, Any]:
 def _iso(dt: datetime) -> str:
     """Return ISO-like string (no timezone suffix)."""
     return dt.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def _strip_crlf(val: Any) -> Optional[str]:
+    if val is None:
+        return None
+    s = str(val).replace("\r", "").replace("\n", "").strip()
+    return s
 
 
 @router.get("/consumption")
@@ -401,3 +408,42 @@ def delete_consumer(id: int, db: Session = Depends(get_db)):
     db.delete(obj)
     db.commit()
     return None
+
+
+@router.get("/by-dtr/{dtr_id}", response_model=List[ConsumerDetailsOut])
+def get_consumers_by_dtr(dtr_id: str, db: Session = Depends(get_db)):
+    """
+    Fetch all consumers for a given DTR (dtr_id).
+    - Case-insensitive
+    - Ignores trailing/leading whitespace and CR/LF in DB rows (e.g. 'FEEDER1_DTR1\\r')
+    """
+
+    # normalize the incoming path param
+    norm_input = _strip_crlf(dtr_id)
+    if not norm_input:
+        raise HTTPException(status_code=400, detail="dtr_id is required")
+
+    # Build a normalized DB column expression:
+    # UPPER(REPLACE(REPLACE(TRIM(DTR_id), '\r', ''), '\n', ''))
+    # (MySQL TRIM handles spaces; REPLACE clears CR/LF)
+    col_norm = func.upper(
+        func.replace(
+            func.replace(func.trim(ConsumerDetails.DTR_id), '\r', ''),
+            '\n', ''
+        )
+    )
+
+    rows = db.execute(
+        select(ConsumerDetails).where(col_norm == func.upper(norm_input))
+    ).scalars().all()
+
+    if not rows:
+        # As a fallback, allow prefix matches like 'FEEDER1_DTR1%' in case of hidden chars
+        rows = db.execute(
+            select(ConsumerDetails).where(col_norm.like(func.upper(norm_input) + "%"))
+        ).scalars().all()
+
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"No consumers found for dtr_id={norm_input}")
+
+    return [_sanitize_consumer_payload(_row_to_dict(r)) for r in rows]

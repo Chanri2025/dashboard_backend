@@ -28,8 +28,8 @@ def decode_access_token(token: str):
 
 
 def make_refresh_token():
-    raw = secrets.token_urlsafe(48)  # return this to client
-    digest = hashlib.sha256(raw.encode()).hexdigest()  # store digest in DB
+    raw = secrets.token_urlsafe(48)  # send this to client
+    digest = hashlib.sha256(raw.encode()).hexdigest()  # store this in DB
     return raw, digest
 
 
