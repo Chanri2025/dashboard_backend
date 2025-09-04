@@ -3,7 +3,10 @@ from __future__ import annotations
 import hashlib, datetime as dt
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Query, Path, status
+from fastapi import (
+    APIRouter, Depends, HTTPException, Request,
+    Query, Path, status, Body
+)
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, constr, field_validator, ConfigDict
 from sqlalchemy.orm import Session, selectinload
@@ -29,9 +32,11 @@ ALLOWED_ALL_ROLES = {
 
 
 def _normalize_role(v: Optional[str]) -> Optional[str]:
-    if not v: return None
+    if not v:
+        return None
     v = v.strip().replace(" ", "-").replace("_", "-").upper()
-    if v in {"SUPERADMIN", "SUPER_ADMIN"}: v = "SUPER-ADMIN"
+    if v in {"SUPERADMIN", "SUPER_ADMIN"}:
+        v = "SUPER-ADMIN"
     return v
 
 
@@ -100,8 +105,10 @@ def _user_to_schema(u: User) -> UserWithRole:
     )
 
 
-def get_current_user(creds: HTTPAuthorizationCredentials = Depends(bearer),
-                     db: Session = Depends(get_db)) -> User:
+def get_current_user(
+        creds: HTTPAuthorizationCredentials = Depends(bearer),
+        db: Session = Depends(get_db)
+) -> User:
     if not creds:
         raise HTTPException(401, "Not authenticated")
     try:
@@ -124,18 +131,57 @@ def require_roles(*allowed):
     return _guard
 
 
+def _extract_refresh_token(request: Request, data: Optional[RefreshIn]) -> Optional[str]:
+    """
+    Accept refresh token from (priority order):
+    1) body: {"refresh_token": "..."}
+    2) cookie: refresh_token / refreshToken
+    3) header: X-Refresh-Token: <token>
+    4) header: Authorization: Refresh <token>
+    """
+    # 1) body
+    if data and data.refresh_token:
+        t = data.refresh_token.strip()
+        if t:
+            return t
+
+    # 2) cookies
+    for key in ("refresh_token", "refreshToken"):
+        v = request.cookies.get(key)
+        if v and v.strip():
+            return v.strip()
+
+    # 3) X-Refresh-Token
+    xrt = request.headers.get("X-Refresh-Token")
+    if xrt and xrt.strip():
+        return xrt.strip()
+
+    # 4) Authorization: Refresh <token>
+    auth = request.headers.get("Authorization")
+    if auth:
+        scheme, _, token = auth.partition(" ")
+        if scheme.lower() == "refresh" and token.strip():
+            return token.strip()
+
+    return None
+
+
 # ---------------- Endpoints ---------------- #
 @router.post("/register", response_model=UserWithRole)
 def register(data: RegisterIn, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(409, "Email already exists")
-    u = User(email=data.email, password_hash=hash_password(data.password),
-             full_name=data.full_name, profile_photo=data.profile_photo)
-    db.add(u);
+    u = User(
+        email=data.email,
+        password_hash=hash_password(data.password),
+        full_name=data.full_name,
+        profile_photo=data.profile_photo
+    )
+    db.add(u)
     db.flush()
     role = _normalize_role(data.role) or "USER"
     r = db.query(Role).filter(Role.name == role).first() or Role(name=role)
-    db.add(r);
+    db.add(r)
     db.flush()
     db.add(UserRole(user_id=u.user_id, role_id=r.role_id))
     db.commit()
@@ -150,11 +196,14 @@ def login(data: LoginIn, request: Request, db: Session = Depends(get_db)):
     roles = [r.name for r in (u.roles or [])]
     access = create_access_token(str(u.user_id), roles)
     raw, digest = make_refresh_token()
-    rt = RefreshToken(user_id=u.user_id, token_hash=digest,
-                      expires_at=refresh_exp(),
-                      user_agent=request.headers.get("user-agent", "")[:255],
-                      ip=(request.client.host if request.client else None))
-    db.add(rt);
+    rt = RefreshToken(
+        user_id=u.user_id,
+        token_hash=digest,
+        expires_at=refresh_exp(),
+        user_agent=request.headers.get("user-agent", "")[:255],
+        ip=(request.client.host if request.client else None)
+    )
+    db.add(rt)
     db.commit()
     return TokenOut(access_token=access, refresh_token=raw, user=_user_to_schema(u))
 
@@ -165,23 +214,46 @@ def me(user: User = Depends(get_current_user)):
 
 
 @router.post("/refresh", response_model=TokenOut)
-def refresh(data: RefreshIn, request: Request, db: Session = Depends(get_db)):
-    token = data.refresh_token or request.cookies.get("refresh_token")
-    if not token: raise HTTPException(401, "Missing refresh token")
+def refresh(
+        request: Request,
+        data: RefreshIn | None = Body(None),
+        db: Session = Depends(get_db),
+):
+    token = _extract_refresh_token(request, data)
+    if not token:
+        raise HTTPException(401, "Missing refresh token (body/cookie/X-Refresh-Token/Authorization: Refresh)")
+
     digest = hashlib.sha256(token.encode()).hexdigest()
-    rt = db.query(RefreshToken).filter(RefreshToken.token_hash == digest, RefreshToken.revoked == False).first()
-    if not rt: raise HTTPException(401, "Invalid refresh token")
+
+    # --- DEBUG prints (remove later) ---
+    print("DEBUG refresh: raw token len =", len(token))
+    print("DEBUG refresh: digest =", digest)
+    # --- END DEBUG ---
+
+    rt = db.query(RefreshToken).filter(
+        RefreshToken.token_hash == digest,
+        RefreshToken.revoked == False
+    ).first()
+    if not rt:
+        raise HTTPException(401, "Invalid refresh token (digest not found)")
     if rt.expires_at <= dt.datetime.utcnow():
         raise HTTPException(401, "Refresh expired")
+
     user = db.query(User).options(selectinload(User.roles)).get(rt.user_id)
     if not user or not user.is_active:
         raise HTTPException(401, "User inactive or missing")
+
+    # rotate
     rt.revoked = True
     new_raw, new_digest = make_refresh_token()
-    db.add(RefreshToken(user_id=user.user_id, token_hash=new_digest,
-                        expires_at=refresh_exp(),
-                        user_agent=request.headers.get("user-agent", "")[:255],
-                        ip=(request.client.host if request.client else None)))
+    db.add(RefreshToken(
+        user_id=user.user_id,
+        token_hash=new_digest,
+        expires_at=refresh_exp(),
+        user_agent=request.headers.get("user-agent", "")[:255],
+        ip=(request.client.host if request.client else None),
+    ))
+
     roles = [r.name for r in (user.roles or [])]
     access = create_access_token(str(user.user_id), roles)
     db.commit()
@@ -206,8 +278,12 @@ def list_users(
 
 
 @router.get("/users/{user_id}", response_model=UserWithRole)
-def get_user(user_id: int = Path(...), db: Session = Depends(get_db),
-             _=Depends(require_roles("SUPER-ADMIN", "ADMIN"))):
+def get_user(
+        user_id: int = Path(...),
+        db: Session = Depends(get_db),
+        _=Depends(require_roles("SUPER-ADMIN", "ADMIN"))
+):
     u = db.query(User).options(selectinload(User.roles)).get(user_id)
-    if not u: raise HTTPException(404, "User not found")
+    if not u:
+        raise HTTPException(404, "User not found")
     return _user_to_schema(u)
