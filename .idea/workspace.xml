@@ -4,7 +4,9 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="6d3c20e0-234c-4e23-add2-70a4ac09e0c0" name="Changes" comment="Auth Part Added - V" />
+    <list default="true" id="6d3c20e0-234c-4e23-add2-70a4ac09e0c0" name="Changes" comment="Auth Part Added - V">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -146,7 +148,10 @@
       <workItem from="1756703987712" duration="3026000" />
       <workItem from="1756708391217" duration="22813000" />
       <workItem from="1757065214607" duration="35000" />
-      <workItem from="1757066960257" duration="4423000" />
+      <workItem from="1757066960257" duration="8762000" />
+      <workItem from="1757399774171" duration="687000" />
+      <workItem from="1757415508099" duration="1431000" />
+      <workItem from="1757593195066" duration="9728000" />
     </task>
     <task id="LOCAL-00001" summary="Version 2.0 Converted to Fast API">
       <option name="closed" value="true" />
@@ -348,7 +353,15 @@
       <option name="project" value="LOCAL" />
       <updated>1756732598076</updated>
     </task>
-    <option name="localTasksCounter" value="26" />
+    <task id="LOCAL-00026" summary="Version 0.1 Modifications - II">
+      <option name="closed" value="true" />
+      <created>1757076035286</created>
+      <option name="number" value="00026" />
+      <option name="presentableId" value="LOCAL-00026" />
+      <option name="project" value="LOCAL" />
+      <updated>1757076035286</updated>
+    </task>
+    <option name="localTasksCounter" value="27" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -366,7 +379,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Version 2.0 Converted to Fast API - II" />
     <MESSAGE value="Auth Part Added - I" />
     <MESSAGE value="Auth Part Added - II" />
     <MESSAGE value="Auth Part Added - III" />
@@ -391,6 +403,7 @@
     <MESSAGE value="Env minor changes - XIV" />
     <MESSAGE value="Env minor changes - XV" />
     <MESSAGE value="Env minor changes - XVI" />
-    <option name="LAST_COMMIT_MESSAGE" value="Env minor changes - XVI" />
+    <MESSAGE value="Version 0.1 Modifications - II" />
+    <option name="LAST_COMMIT_MESSAGE" value="Version 0.1 Modifications - II" />
   </component>
 </project>
