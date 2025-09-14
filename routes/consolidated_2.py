@@ -116,6 +116,14 @@ def fetch_market_prices(ts):
     return dam, rtm, mp
 
 
+def safe_float(val, default=0.0):
+    try:
+        f = float(val)
+        return f if not math.isnan(f) else default
+    except (ValueError, TypeError):
+        return default
+
+
 def fetch_plants_prepare_prefix(ts):
     """
     Fetch plants for timestamp ts with Mongo server-side sort by VC ASC (cheapest-first),
@@ -136,21 +144,23 @@ def fetch_plants_prepare_prefix(ts):
     plants_asc = []
     for p in cursor:
         name = p.get("Plant_Name")
-        dc_raw = p.get("DC", 0.0)
-        sg_raw = p.get("SG", 0.0)
-        vc_raw = p.get("VC", 0.0)
+        dc = safe_float(p.get("DC", 0.0))
+        sg = safe_float(p.get("SG", 0.0))
+        vc = round(safe_float(p.get("VC", 0.0)), 2)
 
-        dc = 0.0 if math.isnan(dc_raw or 0.0) else (dc_raw or 0.0)
-        sg = 0.0 if math.isnan(sg_raw or 0.0) else (sg_raw or 0.0)
-        vc = round(0.0 if math.isnan(vc_raw or 0.0) else (vc_raw or 0.0), 2)
-
-        # ✅ Only Thermal plants get backdown
+        # ✅ Backdown logic by plant type
         if fuel_map.get(name) == "Thermal":
-            bd_units = round(((dc - sg) * 1000 * 0.25) if (dc > sg & sg > 0) else 0.0, 2)
-            bd_cost = round(bd_units * vc if not math.isnan(bd_units * vc) else 0.0, 2)
+            if dc > sg and sg > 0:
+                bd_units = round((dc - sg) * 1000 * 0.25, 2)
+            else:
+                bd_units = 0.0
         else:
-            bd_units = 0.0
-            bd_cost = 0.0
+            if dc > sg:
+                bd_units = round((dc - sg) * 1000 * 0.25, 2)
+            else:
+                bd_units = 0.0
+
+        bd_cost = round(bd_units * vc if not math.isnan(bd_units * vc) else 0.0, 2)
 
         plants_asc.append({
             "Plant_Name": name,
