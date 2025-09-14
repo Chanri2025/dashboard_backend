@@ -146,7 +146,7 @@ def fetch_plants_prepare_prefix(ts):
 
         # ✅ Only Thermal plants get backdown
         if fuel_map.get(name) == "Thermal":
-            bd_units = round(((dc - sg) * 1000 * 0.25) if dc > sg else 0.0, 2)
+            bd_units = round(((dc - sg) * 1000 * 0.25) if (dc > sg & sg > 0) else 0.0, 2)
             bd_cost = round(bd_units * vc if not math.isnan(bd_units * vc) else 0.0, 2)
         else:
             bd_units = 0.0
