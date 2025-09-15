@@ -49,10 +49,6 @@ def _cache_get(ts):
 
 # ---------- Helpers ----------
 def calculate_weighted_average_for_quantum_prefix(q, ts):
-    """
-    O(log n) cost computation using prefix sums (cheapest-first order).
-    Returns (weighted_avg, total_cost, total_units==q).
-    """
     cached = _cache_get(ts)
     if not cached:
         raise LookupError("Prefix cache not prepared for timestamp")
@@ -64,9 +60,20 @@ def calculate_weighted_average_for_quantum_prefix(q, ts):
     if q <= 0:
         return 0.0, 0.0, 0.0
 
-    k = bisect_left(cum_units, q)  # first idx where cum_units[idx] >= q
+    k = bisect_left(cum_units, q)
+
+    # Case 1: q smaller than first block
     if k == 0:
         total_cost = q * vc[0]
+
+    # Case 2: q larger than all available units → clamp to last
+    elif k >= len(cum_units):
+        full_units = cum_units[-1]
+        full_cost = cum_cost[-1]
+        extra = q - full_units
+        total_cost = full_cost + extra * vc[-1]  # use last VC as marginal rate
+
+    # Case 3: normal in-between
     else:
         full_units = cum_units[k - 1]
         full_cost = cum_cost[k - 1]
