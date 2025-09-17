@@ -18,6 +18,7 @@ from Schemas.billing_schema import (
     BillPreviewRequest, BillOut, BillLineOut, BillStatusUpdate
 )
 from utils.date_utils import parse_start_timestamp, parse_end_timestamp
+from Models.consumer_model import ConsumerDetails
 
 load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI")
@@ -388,3 +389,149 @@ def update_bill_status(bill_id: int, body: BillStatusUpdate, db: Session = Depen
     db.commit()
     db.refresh(b)
     return get_bill(bill_id, db)
+
+
+# ───────────────────────── Tariff APIs ─────────────────────────
+
+@router.get("/tariff", response_model=List[dict])
+def list_tariffs(db: Session = Depends(get_db)):
+    """Return tariffs with their slabs included"""
+    tariffs = db.execute(select(TariffPlan)).scalars().all()
+    out = []
+    for t in tariffs:
+        slabs = db.execute(
+            select(TariffSlab).where(TariffSlab.tariff_id == t.id)
+        ).scalars().all()
+        out.append({
+            "id": t.id,
+            "code": t.code,
+            "consumer_type": t.consumer_type,
+            "voltage_kv": t.voltage_kv,
+            "fixed_charge": t.fixed_charge,
+            "tax_percent": t.tax_percent,
+            "demand_charge_per_kw": t.demand_charge_per_kw,
+            "effective_from": t.effective_from,
+            "slabs": [
+                {
+                    "id": s.id,
+                    "slab_from_kwh": s.slab_from_kwh,
+                    "slab_to_kwh": s.slab_to_kwh,
+                    "energy_rate_per_kwh": s.energy_rate_per_kwh
+                }
+                for s in slabs
+            ]
+        })
+    return out
+
+
+@router.get("/tariff/{tariff_id}", response_model=TariffPlanOut)
+def get_tariff(tariff_id: int, db: Session = Depends(get_db)):
+    """Get single tariff plan by ID"""
+    plan = db.get(TariffPlan, tariff_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail="Tariff not found")
+    return plan
+
+
+@router.get("/tariff/{tariff_id}/slabs", response_model=List[TariffSlabCreate])
+def get_tariff_slabs(tariff_id: int, db: Session = Depends(get_db)):
+    """Get all slabs for a given tariff"""
+    slabs = db.execute(
+        select(TariffSlab).where(TariffSlab.tariff_id == tariff_id).order_by(TariffSlab.slab_from_kwh.asc())
+    ).scalars().all()
+    return slabs
+
+
+# ───────────────────── Consumer Tariff Assignment ─────────────────────
+
+@router.get("/consumer/{consumer_id}/tariffs")
+def list_consumer_tariffs(consumer_id: str, db: Session = Depends(get_db)):
+    """
+    List all tariff assignments of a consumer.
+    Shows history if multiple tariffs assigned across periods.
+    """
+    rows = db.execute(
+        select(ConsumerTariff)
+        .where(ConsumerTariff.consumer_id == consumer_id)
+        .order_by(ConsumerTariff.valid_from.desc())
+    ).scalars().all()
+
+    out = []
+    for ct in rows:
+        plan = db.get(TariffPlan, ct.tariff_id)
+        out.append({
+            "assignment_id": ct.id,
+            "consumer_id": ct.consumer_id,
+            "tariff_id": ct.tariff_id,
+            "tariff_code": plan.code if plan else None,
+            "valid_from": ct.valid_from,
+            "valid_to": ct.valid_to,
+            "created_at": ct.created_at,
+        })
+    return out
+
+
+@router.delete("/consumer/tariff/{assignment_id}")
+def delete_consumer_tariff(assignment_id: int, db: Session = Depends(get_db)):
+    """Remove a consumer tariff assignment"""
+    ct = db.get(ConsumerTariff, assignment_id)
+    if not ct:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    db.delete(ct)
+    db.commit()
+    return {"ok": True, "deleted": assignment_id}
+
+
+@router.get("/eligible-consumers")
+def list_eligible_consumers(db: Session = Depends(get_db)):
+    """
+    Return only consumers who have at least one tariff assigned.
+    Uses ConsumerDetails table.
+    """
+    consumers = db.execute(select(ConsumerDetails)).scalars().all()
+    eligible = []
+
+    for c in consumers:
+        tariffs = db.execute(
+            select(ConsumerTariff).where(ConsumerTariff.consumer_id == c.consumer_id)
+        ).scalars().all()
+        if tariffs:
+            eligible.append({
+                "consumer_id": c.consumer_id,
+                "circle": c.circle,
+                "division": c.division,
+                "voltage_kv": c.voltage_kv,
+                "sanction_load_kw": c.sanction_load_kw,
+                "oa_capacity_kw": c.oa_capacity_kw,
+                "consumer_type": c.consumer_type,
+                "Name": c.Name,
+                "Address": c.Address,
+                "District": c.District,
+                "PinCode": c.PinCode,
+                "DTR_id": c.DTR_id,
+            })
+
+    return eligible
+
+
+@router.put("/tariff/{tariff_id}", response_model=TariffPlanOut)
+def update_tariff(tariff_id: int, plan: TariffPlanCreate, db: Session = Depends(get_db)):
+    """Update an existing tariff plan"""
+    obj = db.get(TariffPlan, tariff_id)
+    if not obj:
+        raise HTTPException(status_code=404, detail="Tariff not found")
+
+    # prevent duplicate codes if updating code
+    exists = db.execute(
+        select(TariffPlan).where(TariffPlan.code == plan.code, TariffPlan.id != tariff_id)
+    ).scalar_one_or_none()
+    if exists:
+        raise HTTPException(status_code=409, detail="Tariff code already exists")
+
+    for field, value in plan.model_dump().items():
+        setattr(obj, field, value)
+
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return obj

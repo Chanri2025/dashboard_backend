@@ -12,11 +12,12 @@ class User(Base):
     email = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(120), nullable=False)
-    profile_photo = Column(String, nullable=True)  # LONGTEXT in DB → map to String
+    profile_photo = Column(String, nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
     email_verified = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    last_active = Column(DateTime, nullable=True)  # ✅ NEW
     roles = relationship("Role", secondary="user_roles", back_populates="users")
 
 

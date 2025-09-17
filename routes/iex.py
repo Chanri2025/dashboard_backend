@@ -29,13 +29,13 @@ def get_price_data():
 
 @router.get("/range")
 def get_demand_range(
-        start: str = Query(..., description="Start datetime in format 'YYYY-MM-DD HH:MM' or 'YYYY-MM-DD'"),
-        end: str = Query(..., description="End datetime in same format")
+        start_date: str = Query(..., description="Start datetime in format 'YYYY-MM-DD HH:MM' or 'YYYY-MM-DD'"),
+        end_date: str = Query(..., description="End datetime in same format")
 ):
     """Return predicted IEX prices between timestamps"""
     try:
-        start_dt = parse_start_timestamp(start)
-        end_dt = parse_start_timestamp(end)
+        start_dt = parse_start_timestamp(start_date)
+        end_dt = parse_start_timestamp(end_date)
 
         query = {"TimeStamp": {"$gte": start_dt, "$lte": end_dt}}
         projection = {"_id": 0, "TimeStamp": 1, "Pred_Price": 1}

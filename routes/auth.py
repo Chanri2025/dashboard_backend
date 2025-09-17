@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from fastapi import (
     APIRouter, Depends, HTTPException, Request,
-    Query, Path, status, Body
+    Query, Path, Body
 )
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr, constr, field_validator, ConfigDict
@@ -14,25 +14,14 @@ from sqlalchemy import func
 
 from Connections.db_sql import get_db
 from Models.auth_models import User, Role, UserRole, RefreshToken, AuthAudit
+from Schemas.auth_schemas import UpdatePhotoIn
 from utils.security import (
     hash_password, verify_password,
     create_access_token, decode_access_token,
     make_refresh_token, refresh_exp,
 )
-# Allowed roles (centralized set)
-ALLOWED_ALL_ROLES = {
-    "SUPER-ADMIN", "ADMIN", "USER", "GUEST",
-    "ADMIN-PROCUREMENT", "MANAGER-PROCUREMENT", "EMPLOYEE-PROCUREMENT",
-    "ADMIN-DISTRIBUTION", "MANAGER-DISTRIBUTION", "EMPLOYEE-DISTRIBUTION",
-}
 
-def _normalize_role(v: str) -> str:
-    return v.strip().replace(" ", "-").replace("_", "-").upper()
-
-router = APIRouter()
-bearer = HTTPBearer(auto_error=False)
-
-# ---------------- Allowed Roles ---------------- #
+# ---------------- Roles ---------------- #
 ALLOWED_PUBLIC_ROLES = {"USER", "GUEST"}
 ALLOWED_ALL_ROLES = {
     "SUPER-ADMIN", "ADMIN", "USER", "GUEST",
@@ -49,8 +38,10 @@ def _normalize_role(v: Optional[str]) -> Optional[str]:
         v = "SUPER-ADMIN"
     return v
 
+
 def _norm_role(v: str) -> str:
     return v.strip().replace(" ", "-").replace("_", "-").upper()
+
 
 # ---------------- Schemas ---------------- #
 class RegisterIn(BaseModel):
@@ -81,6 +72,9 @@ class UserOut(BaseModel):
     profile_photo: Optional[str]
     is_active: bool
     email_verified: bool
+    created_at: Optional[dt.datetime] = None  # ⬅️ made optional
+    updated_at: Optional[dt.datetime] = None  # ⬅️ made optional
+    last_active: Optional[dt.datetime] = None
 
 
 class UserWithRole(UserOut):
@@ -105,7 +99,7 @@ class UsersPageOut(BaseModel):
     page: int
     page_size: int
 
-# ============ Schemas ============
+
 class UpdateUserIn(BaseModel):
     full_name: Optional[str] = None
     profile_photo: Optional[str] = None
@@ -122,41 +116,26 @@ class AssignRolesIn(BaseModel):
         return [_norm_role(r) for r in roles]
 
 
-class UserOut(BaseModel):
-    user_id: int
-    email: str
-    full_name: str
-    profile_photo: Optional[str] = None
-    is_active: bool
-    email_verified: bool
-    role: Optional[str] = None
-    roles: Optional[List[str]] = None
-
-
-def _user_to_schema(u: User) -> UserOut:
-    rs = [r.name for r in (u.roles or [])]
-    return UserOut(
+# ---------------- Helpers ---------------- #
+def _user_to_schema(u: User) -> UserWithRole:
+    roles = [r.name for r in (u.roles or [])]
+    return UserWithRole(
         user_id=u.user_id,
         email=u.email,
         full_name=u.full_name,
         profile_photo=u.profile_photo,
         is_active=u.is_active,
         email_verified=u.email_verified,
-        role=(rs[0] if rs else None),
-        roles=(rs or None),
+        created_at=u.created_at,
+        updated_at=u.updated_at,
+        last_active=u.last_active,
+        role=(roles[0] if roles else None),
+        roles=(roles or None),
     )
 
 
-
-# ---------------- Helpers ---------------- #
-def _user_to_schema(u: User) -> UserWithRole:
-    roles = [r.name for r in (u.roles or [])]
-    return UserWithRole(
-        user_id=u.user_id, email=u.email, full_name=u.full_name,
-        profile_photo=u.profile_photo,
-        is_active=u.is_active, email_verified=u.email_verified,
-        role=(roles[0] if roles else None), roles=(roles or None)
-    )
+router = APIRouter()
+bearer = HTTPBearer(auto_error=False)
 
 
 def get_current_user(
@@ -186,31 +165,18 @@ def require_roles(*allowed):
 
 
 def _extract_refresh_token(request: Request, data: Optional[RefreshIn]) -> Optional[str]:
-    """
-    Accept refresh token from (priority order):
-    1) body: {"refresh_token": "..."}
-    2) cookie: refresh_token / refreshToken
-    3) header: X-Refresh-Token: <token>
-    4) header: Authorization: Refresh <token>
-    """
-    # 1) body
-    if data and data.refresh_token:
-        t = data.refresh_token.strip()
-        if t:
-            return t
+    if data and data.refresh_token and data.refresh_token.strip():
+        return data.refresh_token.strip()
 
-    # 2) cookies
     for key in ("refresh_token", "refreshToken"):
         v = request.cookies.get(key)
         if v and v.strip():
             return v.strip()
 
-    # 3) X-Refresh-Token
     xrt = request.headers.get("X-Refresh-Token")
     if xrt and xrt.strip():
         return xrt.strip()
 
-    # 4) Authorization: Refresh <token>
     auth = request.headers.get("Authorization")
     if auth:
         scheme, _, token = auth.partition(" ")
@@ -247,6 +213,12 @@ def login(data: LoginIn, request: Request, db: Session = Depends(get_db)):
     u = db.query(User).options(selectinload(User.roles)).filter(User.email == data.email).first()
     if not u or not verify_password(data.password, u.password_hash):
         raise HTTPException(401, "Invalid credentials")
+
+    # ✅ Update last_active
+    u.last_active = func.now()
+    db.commit()
+    db.refresh(u)
+
     roles = [r.name for r in (u.roles or [])]
     access = create_access_token(str(u.user_id), roles)
     raw, digest = make_refresh_token()
@@ -275,21 +247,15 @@ def refresh(
 ):
     token = _extract_refresh_token(request, data)
     if not token:
-        raise HTTPException(401, "Missing refresh token (body/cookie/X-Refresh-Token/Authorization: Refresh)")
+        raise HTTPException(401, "Missing refresh token")
 
     digest = hashlib.sha256(token.encode()).hexdigest()
-
-    # --- DEBUG prints (remove later) ---
-    print("DEBUG refresh: raw token len =", len(token))
-    print("DEBUG refresh: digest =", digest)
-    # --- END DEBUG ---
-
     rt = db.query(RefreshToken).filter(
         RefreshToken.token_hash == digest,
         RefreshToken.revoked == False
     ).first()
     if not rt:
-        raise HTTPException(401, "Invalid refresh token (digest not found)")
+        raise HTTPException(401, "Invalid refresh token")
     if rt.expires_at <= dt.datetime.utcnow():
         raise HTTPException(401, "Refresh expired")
 
@@ -297,7 +263,9 @@ def refresh(
     if not user or not user.is_active:
         raise HTTPException(401, "User inactive or missing")
 
-    # rotate
+    # ✅ Update last_active also on refresh
+    user.last_active = func.now()
+
     rt.revoked = True
     new_raw, new_digest = make_refresh_token()
     db.add(RefreshToken(
@@ -314,12 +282,11 @@ def refresh(
     return TokenOut(access_token=access, refresh_token=new_raw, user=_user_to_schema(user))
 
 
-# ---------------- Users endpoints ---------------- #
 @router.get("/users", response_model=List[UserWithRole])
 def list_users(
         q: Optional[str] = Query(None),
         db: Session = Depends(get_db),
-        _=Depends(require_roles("SUPER-ADMIN", "ADMIN")),
+        _=Depends(require_roles("SUPER-ADMIN", "ADMIN", "MANAGER-PROCUREMENT", "MANAGER-DISTRIBUTION")),
 ):
     query = db.query(User).options(selectinload(User.roles))
     if q:
@@ -343,15 +310,37 @@ def get_user(
     return _user_to_schema(u)
 
 
+@router.patch("/me/photo", response_model=UserWithRole)
+def update_my_photo(
+        body: UpdatePhotoIn,
+        user: User = Depends(get_current_user),
+        db: Session = Depends(get_db),
+):
+    if not body.profile_photo:
+        raise HTTPException(400, "profile_photo is required")
+
+    data = body.profile_photo.strip()
+
+    # Optionally normalize → remove data URI prefix
+    if data.startswith("data:image"):
+        _, b64data = data.split(",", 1)
+        data = b64data
+
+    user.profile_photo = data
+    db.commit()
+    db.refresh(user)
+    return _user_to_schema(user)
+
+
 @router.patch(
     "/users/{user_id}",
-    response_model=UserOut,
-    dependencies=[Depends(require_roles("SUPER-ADMIN", "ADMIN"))],
+    response_model=UserWithRole,
+    dependencies=[Depends(require_roles("SUPER-ADMIN", "ADMIN", "MANAGER-PROCUREMENT", "MANAGER-DISTRIBUTION", ))],
 )
 def update_user(
-    user_id: int = Path(...),
-    body: UpdateUserIn = None,
-    db: Session = Depends(get_db),
+        user_id: int = Path(...),
+        body: UpdateUserIn = None,
+        db: Session = Depends(get_db),
 ):
     u = db.query(User).options(selectinload(User.roles)).get(user_id)
     if not u:
@@ -372,7 +361,7 @@ def update_user(
 
 @router.post(
     "/assign-roles",
-    response_model=UserOut,
+    response_model=UserWithRole,
     dependencies=[Depends(require_roles("SUPER-ADMIN", "ADMIN"))],
 )
 def assign_roles(payload: AssignRolesIn, request: Request, db: Session = Depends(get_db)):
@@ -381,12 +370,10 @@ def assign_roles(payload: AssignRolesIn, request: Request, db: Session = Depends
         raise HTTPException(404, "User not found")
 
     wanted = {_norm_role(r) for r in payload.roles}
-    # validate against allowed set
     for r in wanted:
         if r not in ALLOWED_ALL_ROLES:
             raise HTTPException(400, f"Invalid role: {r}")
 
-    # ensure role rows exist
     role_objs = []
     for r in wanted:
         obj = db.query(Role).filter(func.upper(Role.name) == r).first()

@@ -2034,7 +2034,7 @@ effective_from</ColNames>
       <StoredType>bigint|0s</StoredType>
     </column>
     <column id="529" parent="323" name="user_id">
-      <AutoIncrement>18</AutoIncrement>
+      <AutoIncrement>25</AutoIncrement>
       <NotNull>1</NotNull>
       <Position>1</Position>
       <StoredType>bigint|0s</StoredType>
@@ -2071,12 +2071,16 @@ effective_from</ColNames>
       <Position>9</Position>
       <StoredType>datetime|0s</StoredType>
     </column>
-    <index id="538" parent="323" name="PRIMARY">
+    <column id="538" parent="323" name="last_active">
+      <Position>10</Position>
+      <StoredType>datetime|0s</StoredType>
+    </column>
+    <index id="539" parent="323" name="PRIMARY">
       <ColNames>user_id</ColNames>
       <Type>btree</Type>
       <Unique>1</Unique>
     </index>
-    <key id="539" parent="323" name="PRIMARY">
+    <key id="540" parent="323" name="PRIMARY">
       <NameSurrogate>1</NameSurrogate>
       <Primary>1</Primary>
       <UnderlyingIndexName>PRIMARY</UnderlyingIndexName>

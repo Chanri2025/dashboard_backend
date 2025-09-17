@@ -15,8 +15,10 @@ from utils.mongo_index import ensure_index
 from utils.date_utils import parse_start_timestamp, parse_end_timestamp
 from utils.mongo_helpers import convert_decimal128
 
+from middlewares.transaction_logger_middleware import TransactionLoggerMiddleware
+
 # ── Routers
-from routes.routes_auth import router as auth_router
+from routes.auth import router as auth_router
 from routes.availability import router as availability_router
 from routes.backdown import router as backdown_router
 from routes.consolidated import router as consolidated_router
@@ -107,6 +109,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(TransactionLoggerMiddleware)
 
 # Register Routers
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])

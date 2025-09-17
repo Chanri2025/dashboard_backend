@@ -1,19 +1,15 @@
+import datetime
+from typing import List, Optional
 from pydantic import BaseModel, EmailStr, constr, field_validator, ConfigDict
-from typing import List
 
-# Allowed roles
+from Models.auth_models import User
+
+# ---------------- Allowed Roles ---------------- #
 ALLOWED_PUBLIC_ROLES = {"USER", "GUEST"}
 ALLOWED_ALL_ROLES = {
-    "SUPER-ADMIN",
-    "ADMIN",
-    "USER",
-    "GUEST",
-    "ADMIN-PROCUREMENT",
-    "MANAGER-PROCUREMENT",
-    "EMPLOYEE-PROCUREMENT",
-    "ADMIN-DISTRIBUTION",
-    "MANAGER-DISTRIBUTION",
-    "EMPLOYEE-DISTRIBUTION",
+    "SUPER-ADMIN", "ADMIN", "USER", "GUEST",
+    "ADMIN-PROCUREMENT", "MANAGER-PROCUREMENT", "EMPLOYEE-PROCUREMENT",
+    "ADMIN-DISTRIBUTION", "MANAGER-DISTRIBUTION", "EMPLOYEE-DISTRIBUTION",
 }
 
 
@@ -34,8 +30,8 @@ class RegisterIn(BaseModel):
     email: EmailStr
     password: constr(min_length=8)
     full_name: constr(min_length=2, max_length=120)
-    profile_photo: str | None = None
-    role: str | None = None  # public may request USER/GUEST
+    profile_photo: Optional[str] = None
+    role: Optional[str] = None  # public may request USER/GUEST
 
     @field_validator("role")
     @classmethod
@@ -79,19 +75,22 @@ class LoginIn(BaseModel):
 
 # ---------- Responses ----------
 class UserOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
     user_id: int
-    email: EmailStr
+    email: str
     full_name: str
-    profile_photo: str | None = None
+    profile_photo: Optional[str] = None
     is_active: bool
     email_verified: bool
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+    last_active: Optional[datetime.datetime] = None
+    role: Optional[str] = None
+    roles: Optional[List[str]] = None
 
 
 class UserWithRole(UserOut):
     model_config = ConfigDict(from_attributes=True)
-    role: str | None = None  # primary display role
-    roles: List[str] | None = None  # full list if you need it
+    # Inherits everything from UserOut (timestamps included)
 
 
 class TokenOut(BaseModel):
@@ -105,6 +104,25 @@ class UpdatePhotoIn(BaseModel):
     profile_photo: str  # base64 data URL string
 
 
+
 class ChangePasswordIn(BaseModel):
     old_password: str
     new_password: constr(min_length=8)
+
+
+# ---------- Helper ----------
+def _user_to_schema(u: User) -> UserOut:
+    rs = [r.name for r in (u.roles or [])]
+    return UserOut(
+        user_id=u.user_id,
+        email=u.email,
+        full_name=u.full_name,
+        profile_photo=u.profile_photo,
+        is_active=u.is_active,
+        email_verified=u.email_verified,
+        created_at=u.created_at,
+        updated_at=u.updated_at,
+        last_active=u.last_active,
+        role=(rs[0] if rs else None),
+        roles=(rs or None),
+    )
