@@ -109,7 +109,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(TransactionLoggerMiddleware)
+# app.add_middleware(TransactionLoggerMiddleware)
 
 # Register Routers
 app.include_router(auth_router, prefix="/auth", tags=["Auth"])

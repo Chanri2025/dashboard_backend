@@ -5,6 +5,7 @@ from datetime import datetime
 import os
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from pymongo import MongoClient
@@ -19,6 +20,9 @@ from Schemas.billing_schema import (
 )
 from utils.date_utils import parse_start_timestamp, parse_end_timestamp
 from Models.consumer_model import ConsumerDetails
+from Schemas.billing_schema import ConsumerTariffCreate, ConsumerTariffUpdate, ConsumerTariffOut
+from Models.billing_models import ConsumerTariff
+from sqlalchemy.exc import IntegrityError
 
 load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI")
@@ -165,6 +169,11 @@ def _apply_slabs(kwh: float, slabs: List[TariffSlab]) -> Tuple[Decimal, List[Bil
     return total, lines
 
 
+class TariffAssignmentUpdate(BaseModel):
+    valid_from: Optional[str]
+    valid_to: Optional[str]
+
+
 def _preview_bill(
         db: Session,
         consumer_id: str,
@@ -259,10 +268,15 @@ def add_slabs(tariff_id: int, slabs: List[TariffSlabCreate], db: Session = Depen
 
 @router.post("/assign-tariff", status_code=status.HTTP_201_CREATED)
 def assign_tariff(payload: AssignTariff, db: Session = Depends(get_db)):
-    # Optionally validate consumer_id exists in consumer_details before assigning
-    db.add(ConsumerTariff(**payload.model_dump()))
-    db.commit()
-    return {"ok": True}
+    try:
+        db.add(ConsumerTariff(**payload.model_dump()))
+        db.commit()
+        return {"ok": True}
+    except Exception as e:
+        db.rollback()
+        if "Duplicate entry" in str(e):
+            raise HTTPException(status_code=409, detail="Tariff assignment already exists")
+        raise HTTPException(status_code=500, detail="Unexpected error during tariff assignment")
 
 
 @router.post("/preview", response_model=BillOut)
@@ -471,47 +485,72 @@ def list_consumer_tariffs(consumer_id: str, db: Session = Depends(get_db)):
     return out
 
 
-@router.delete("/consumer/tariff/{assignment_id}")
-def delete_consumer_tariff(assignment_id: int, db: Session = Depends(get_db)):
-    """Remove a consumer tariff assignment"""
-    ct = db.get(ConsumerTariff, assignment_id)
-    if not ct:
-        raise HTTPException(status_code=404, detail="Assignment not found")
-    db.delete(ct)
-    db.commit()
-    return {"ok": True, "deleted": assignment_id}
+@router.get("/consumer-tariffs", response_model=List[Dict[str, Any]])
+def list_consumer_tariff_assignments(db: Session = Depends(get_db)):
+    """
+    Returns all rows from consumer_tariffs table only.
+    To be filtered on frontend by consumer_type from /tariff.
+    """
+    rows = db.execute(select(ConsumerTariff)).scalars().all()
+
+    return [
+        {
+            "assignment_id": r.id,
+            "consumer_id": r.consumer_id,
+            "tariff_id": r.tariff_id,
+            "valid_from": r.valid_from,
+            "valid_to": r.valid_to,
+            "created_at": r.created_at
+        }
+        for r in rows
+    ]
 
 
 @router.get("/eligible-consumers")
 def list_eligible_consumers(db: Session = Depends(get_db)):
     """
-    Return only consumers who have at least one tariff assigned.
-    Uses ConsumerDetails table.
+    Return all consumers with full tariff assignment history.
+    Used for frontend filtering and assignment tracking.
     """
     consumers = db.execute(select(ConsumerDetails)).scalars().all()
-    eligible = []
+    out = []
 
     for c in consumers:
-        tariffs = db.execute(
-            select(ConsumerTariff).where(ConsumerTariff.consumer_id == c.consumer_id)
+        assignments = db.execute(
+            select(ConsumerTariff)
+            .where(ConsumerTariff.consumer_id == c.consumer_id)
+            .order_by(ConsumerTariff.valid_from.desc())
         ).scalars().all()
-        if tariffs:
-            eligible.append({
-                "consumer_id": c.consumer_id,
-                "circle": c.circle,
-                "division": c.division,
-                "voltage_kv": c.voltage_kv,
-                "sanction_load_kw": c.sanction_load_kw,
-                "oa_capacity_kw": c.oa_capacity_kw,
-                "consumer_type": c.consumer_type,
-                "Name": c.Name,
-                "Address": c.Address,
-                "District": c.District,
-                "PinCode": c.PinCode,
-                "DTR_id": c.DTR_id,
+
+        assignment_list = []
+        for a in assignments:
+            plan = db.get(TariffPlan, a.tariff_id)
+            assignment_list.append({
+                "assignment_id": a.id,
+                "tariff_id": a.tariff_id,
+                "tariff_code": plan.code if plan else None,
+                "valid_from": a.valid_from,
+                "valid_to": a.valid_to,
+                "created_at": a.created_at,
             })
 
-    return eligible
+        out.append({
+            "consumer_id": c.consumer_id,
+            "circle": c.circle,
+            "division": c.division,
+            "voltage_kv": c.voltage_kv,
+            "sanction_load_kw": c.sanction_load_kw,
+            "oa_capacity_kw": c.oa_capacity_kw,
+            "consumer_type": c.consumer_type,
+            "Name": c.Name,
+            "Address": c.Address,
+            "District": c.District,
+            "PinCode": c.PinCode,
+            "DTR_id": c.DTR_id,
+            "tariff_assignments": assignment_list
+        })
+
+    return out
 
 
 @router.put("/tariff/{tariff_id}", response_model=TariffPlanOut)
@@ -535,3 +574,65 @@ def update_tariff(tariff_id: int, plan: TariffPlanCreate, db: Session = Depends(
     db.commit()
     db.refresh(obj)
     return obj
+
+
+@router.post("/consumer-tariffs", response_model=ConsumerTariffOut, status_code=201)
+def create_consumer_tariff(payload: ConsumerTariffCreate, db: Session = Depends(get_db)):
+    ct = ConsumerTariff(**payload.model_dump())
+    db.add(ct)
+    try:
+        db.commit()
+        db.refresh(ct)
+        return ct
+    except IntegrityError as e:
+        db.rollback()
+        if "uq_consumer_tariff" in str(e):
+            raise HTTPException(status_code=409, detail="Tariff assignment already exists")
+        raise HTTPException(status_code=500, detail="Database error during creation")
+
+
+# 📤 Read all consumer tariff assignments
+@router.get("/consumer-tariffs", response_model=List[ConsumerTariffOut])
+def get_all_consumer_tariffs(db: Session = Depends(get_db)):
+    return db.execute(select(ConsumerTariff).order_by(ConsumerTariff.created_at.desc())).scalars().all()
+
+
+# 📄 Read single tariff assignment
+@router.get("/consumer-tariffs/{assignment_id}", response_model=ConsumerTariffOut)
+def get_consumer_tariff(assignment_id: int, db: Session = Depends(get_db)):
+    ct = db.get(ConsumerTariff, assignment_id)
+    if not ct:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    return ct
+
+
+# ✏️ Update tariff assignment
+
+@router.patch("/consumer-tariffs/{assignment_id}", response_model=ConsumerTariffOut)
+def update_tariff_assignment(
+        assignment_id: int,
+        payload: ConsumerTariffUpdate,
+        db: Session = Depends(get_db)
+):
+    ct = db.get(ConsumerTariff, assignment_id)
+    if not ct:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    for key, value in payload.model_dump(exclude_unset=True).items():
+        setattr(ct, key, value)
+
+    db.add(ct)
+    db.commit()
+    db.refresh(ct)
+    return ct
+
+
+# ❌ Delete assignment
+@router.delete("/consumer-tariffs/{assignment_id}")
+def delete_consumer_tariff(assignment_id: int, db: Session = Depends(get_db)):
+    ct = db.get(ConsumerTariff, assignment_id)
+    if not ct:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    db.delete(ct)
+    db.commit()
+    return {"ok": True, "deleted": assignment_id}

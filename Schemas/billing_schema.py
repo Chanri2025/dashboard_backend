@@ -1,7 +1,7 @@
 # Schemas/billing_schema.py
 from pydantic import BaseModel, condecimal, Field
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, date
 
 
 # ----- Tariffs -----
@@ -74,3 +74,24 @@ class BillOut(BaseModel):
     total_amount: float
     status: str
     lines: List[BillLineOut] = []
+
+class ConsumerTariffBase(BaseModel):
+    consumer_id: str
+    tariff_id: int
+    valid_from: date
+    valid_to: Optional[date] = None
+
+class ConsumerTariffCreate(ConsumerTariffBase):
+    pass
+
+class ConsumerTariffUpdate(BaseModel):
+    valid_from: Optional[date] = None
+    valid_to: Optional[date] = None
+    tariff_id: Optional[int] = None  # Allow updating tariff assignment
+
+class ConsumerTariffOut(ConsumerTariffBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
