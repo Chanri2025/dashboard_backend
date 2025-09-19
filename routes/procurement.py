@@ -3,6 +3,8 @@ import logging
 from fastapi import APIRouter, HTTPException, Query
 from collections import OrderedDict
 from fastapi.responses import JSONResponse
+from fastapi import Request
+from datetime import timedelta
 from functools import lru_cache
 from datetime import datetime
 from typing import Dict, Any, List, Union
@@ -38,7 +40,7 @@ Demand = mdb["Demand"]
 Banking = mdb["Banking_Data"]
 IEX_Gen = mdb["IEX_Generation"]
 MustRunPred = mdb["mustrunplantconsumption"]
-DemandOutput = mdb["Demand_Output"]
+DemandOutput = mdb["Demand_Output_Approval"]
 
 
 # ───────────────────── cached lookups ─────────────────────
@@ -321,6 +323,7 @@ def _get_other_run(net2_kwh: float, ts_dt: datetime) -> Dict[str, Any]:
 # ───────────────────── Main endpoint ─────────────────────
 @router.get("/", response_class=JSONResponse, description="MOD Pricing")
 def get_MOD(
+        request: Request,  # ✅ Add this to access headers
         start_date: str = Query(..., description="Accepts 'YYYY-MM-DD', 'YYYY-MM-DD HH:MM', or 'YYYY-MM-DD HH:MM:SS'"),
         price_cap: float = Query(0, description="IEX price cap"),
 ):
@@ -406,10 +409,18 @@ def get_MOD(
             "Backdown_Unit": backdown_unit if banking_unit > 0 else 0.0,
         })
 
+        # ✅ Add metadata fields for logging
+        uploaded_by = request.headers.get("X-User-Email", "unknown")
+        uploaded_date = datetime.utcnow() + timedelta(hours=5, minutes=30)
+
         # Atomic upsert (safer than delete + insert)
         DemandOutput.replace_one(
             {"TimeStamp": ts_dt},
-            {**result, "TimeStamp": ts_dt},
+            {**result,
+             "TimeStamp": ts_dt,
+             "uploaded_by": uploaded_by,
+             "uploaded_date": uploaded_date,
+             },
             upsert=True
         )
 

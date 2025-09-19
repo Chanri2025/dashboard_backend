@@ -19,6 +19,10 @@ class TransactionLoggerMiddleware(BaseHTTPMiddleware):
         duration = int((time.time() - start) * 1000)
         response_body = getattr(response, "body", None)
 
+        # ✅ Skip logging for /auth/refresh
+        if request.url.path == "/auth/refresh":
+            return response
+
         # Build log doc
         log = build_log(
             request,
@@ -29,7 +33,6 @@ class TransactionLoggerMiddleware(BaseHTTPMiddleware):
         log["author"] = request.headers.get("X-User-Email")
 
         try:
-            # ✅ use the same DB initialized in main.py lifespan
             db = request.app.state.mongo_sync_db
             log_transaction_sync(db, log)
         except Exception as e:

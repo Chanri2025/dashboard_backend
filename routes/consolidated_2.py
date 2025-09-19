@@ -17,7 +17,8 @@ client = MongoClient(mongo_uri)
 power_db = client["power_casting_new"]
 
 # --- target collection for consolidated records ---
-bank_adj_coll = power_db["Banking-Adjust-consolidated"]
+bank_adj_coll = power_db["Banking_Adjust_Consolidated_approval"]
+bank_adj_coll_2 = power_db["Banking_Adjust_Consolidated"]
 
 # --- helpful compound indexes (create if missing, safe to call repeatedly) ---
 power_db["Plant_Generation"].create_index([("Timestamp", ASCENDING), ("VC", ASCENDING)])
@@ -557,3 +558,31 @@ async def calculate_consolidated(start_date: str = Query(..., alias="start_date"
         )
 
     return JSONResponse(content=result)
+
+
+@router.get("/all")
+async def get_all_consolidated_data(
+        start_date: str = Query(None),
+        end_date: str = Query(None)
+):
+    try:
+        query = {}
+
+        if start_date:
+            start_dt = parse_start_timestamp(start_date)
+            query["Timestamp"] = {"$gte": start_dt}
+
+        if end_date:
+            end_dt = parse_start_timestamp(end_date)
+            if "Timestamp" in query:
+                query["Timestamp"]["$lte"] = end_dt
+            else:
+                query["Timestamp"] = {"$lte": end_dt}
+
+        # Sort by Timestamp ASC for readability
+        results = list(bank_adj_coll_2.find(query, {"_id": 0}).sort("Timestamp", ASCENDING))
+
+        return {"count": len(results), "data": results}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
