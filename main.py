@@ -36,6 +36,7 @@ from routes.substation import router as substation_router
 from routes.consumption import router as consumption_router
 from routes.billing import router as billing_router
 from routes.complaints import router as complaints_router
+from routes.menu import router as menu_router
 
 load_dotenv()
 
@@ -130,6 +131,7 @@ app.include_router(region_router, prefix="/region", tags=["Region"])
 app.include_router(substation_router, prefix="/substation", tags=["Sub - Station"])
 app.include_router(complaints_router, prefix="/complaints", tags=["Complaints"])
 app.include_router(billing_router, prefix="/billing", tags=["Billing"])
+app.include_router(menu_router, prefix="/menu", tags=["Menu"])
 
 
 # ── Dashboard Route ────────────────────────────────────────────────

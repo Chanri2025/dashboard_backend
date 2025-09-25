@@ -2053,7 +2053,7 @@ effective_from</ColNames>
     </column>
     <column id="533" parent="323" name="profile_photo">
       <Position>5</Position>
-      <StoredType>text|0s</StoredType>
+      <StoredType>longtext|0s</StoredType>
     </column>
     <column id="534" parent="323" name="is_active">
       <Position>6</Position>

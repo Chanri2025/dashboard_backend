@@ -311,22 +311,17 @@ def get_user(
 
 
 @router.patch("/me/photo", response_model=UserWithRole)
-def update_my_photo(
-        body: UpdatePhotoIn,
-        user: User = Depends(get_current_user),
-        db: Session = Depends(get_db),
-):
+def update_my_photo(body: UpdatePhotoIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     if not body.profile_photo:
         raise HTTPException(400, "profile_photo is required")
 
     data = body.profile_photo.strip()
 
-    # Optionally normalize → remove data URI prefix
     if data.startswith("data:image"):
         _, b64data = data.split(",", 1)
         data = b64data
 
-    user.profile_photo = data
+    user.profile_photo = data  # ✅ stored as base64 string
     db.commit()
     db.refresh(user)
     return _user_to_schema(user)
