@@ -1,0 +1,12 @@
+.git
+.gitignore
+__pycache__/
+*.py[cod]
+*.log
+.env
+.env.*
+.vscode/
+.idea/
+tests/
+dist/
+build/
