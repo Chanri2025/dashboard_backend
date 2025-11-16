@@ -100,7 +100,7 @@ async def lifespan(app: FastAPI):
         sm_client.close()
 
 
-app = FastAPI(title="Power Casting API", debug=True, lifespan=lifespan)
+app = FastAPI(title="Power Casting API", debug=True, lifespan=lifespan,version="1.0.0")
 
 # CORS
 app.add_middleware(
