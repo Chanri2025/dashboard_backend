@@ -309,16 +309,20 @@ def decide_banking(timestamp, banked_units, scheduled_generation, drawl,
                    units_available_before):
     """
     Uses O(log n) prefix sums to compute weighted average costs.
-    Also returns plants_with_usage (DESC) for the response.
+    Also returns plants_with_usage for the response.
     """
-    s_d = max(scheduled_generation - drawl, 0.0)  # schedule surplus
+    s_d = scheduled_generation - drawl
+    # print("Banked Units", banked_units)
+    # print("Scheduled Generation", scheduled_generation)
+    # print("Drawl", drawl)
+    # print('SG - Drawl =',s_d)
     units_after = units_available_before
     banking_cost = 0.0
     market_purchase = 0.0
     dsm_units = 0.0
     cycle = "NO_CHARGE"
 
-    # default plants_with_usage = zeros allocated (but DESC sorted for response)
+    # Always initialize plants_with_usage (so response is stable)
     plants_with_usage = allocate_used_for_quantum_desc(timestamp, 0.0)
 
     if banked_units <= 0:
@@ -333,69 +337,95 @@ def decide_banking(timestamp, banked_units, scheduled_generation, drawl,
             "plants_with_usage": plants_with_usage
         }
 
+    # -------------------------
+    # CASE 1: surplus exists
+    # -------------------------
     if s_d > 0:
+        # 1A: surplus fully covers banked_units
         if s_d >= banked_units:
             if not in_dsm_window(timestamp):
                 cycle = "CHARGE"
                 banking_cost = 0.0
+
                 if units_after == 0:
-                    # all go to DSM (nothing to charge)
                     dsm_units = banked_units
                     upsert_battery_status(timestamp, 0, cycle)
+
                 elif units_available_before > banked_units:
-                    # all banked_units go to battery
                     dsm_units = 0.0
                     upsert_battery_status(timestamp, banked_units, cycle)
                     units_after = units_available_before - banked_units
+
                 else:
-                    # partial: some go to battery, rest to DSM
                     dsm_units = banked_units - units_available_before
                     upsert_battery_status(timestamp, units_available_before, cycle)
                     units_after = 0.0
             else:
-                # DSM all banked units during DSM window
+                # DSM window: all to DSM
                 dsm_units = banked_units
                 cycle = "NO_CHARGE"
                 banking_cost = 0.0
                 upsert_battery_status(timestamp, banked_units, cycle)
-            # for display, allocation is not actually used here; keep zeros
+
+            # allocation is not used here (charging/DSM), keep zeros
+
+        # 1B: surplus partially covers banked_units -> need "balanced_units"
         else:
-            # s_d consumes part; remaining are "balanced_units"
             balanced_units = round(banked_units - s_d, 3)
+            # print("Balance Units (C)",balanced_units)
             cycle = "NO_CHARGE"
-            # O(log n) weighted average using prefix
-            wavg, tot_bd_cost_for_balanced, total_units_used = calculate_weighted_average_for_quantum_prefix(
-                balanced_units, timestamp
-            )
-            banking_cost = round(tot_bd_cost_for_balanced, 2)
-            total_backdown_units_used = total_units_used
 
-            if balanced_units >= total_backdown_units_used:
-                # Extra from market
-                market_purchase = balanced_units - total_backdown_units_used
-                banking_cost = round(tot_bd_cost_for_balanced + market_purchase * min(dam, rtm), 2)
+            if balanced_units >= total_backdown_units:
+                # Use ALL backdown + buy remaining from market
+                market_purchase = round(balanced_units - total_backdown_units, 3)
+                # print("Market Purchase (M)",market_purchase)
+                banking_cost = round(total_backdown_cost + market_purchase * min(dam, rtm), 2)
+                # print("Banking Cost (B)",banking_cost)
+
+                # weighted avg for the balanced_units including market portion (for UI)
+                if balanced_units > 0:
+                    weighted_average_mod = round(total_backdown_cost / total_backdown_units, 2)
+
+                # allocation: show usage of all available backdown
+                plants_with_usage = allocate_used_for_quantum_desc(timestamp, total_backdown_units)
+
+            else:
+                # balanced_units can be fully satisfied from backdown stack
+                wavg, tot_bd_cost_for_balanced, _ = calculate_weighted_average_for_quantum_prefix(
+                    balanced_units, timestamp
+                )
+                banking_cost = round(tot_bd_cost_for_balanced, 2)
+                weighted_average_mod = wavg
+
+                # allocation: show which plants contributed to balanced_units
+                plants_with_usage = allocate_used_for_quantum_desc(timestamp, balanced_units)
 
             upsert_battery_status(timestamp, banked_units, cycle)
-            # Provide per-plant usage for the entire banked_units (for UI visibility)
-            plants_with_usage = allocate_used_for_quantum_desc(timestamp, balanced_units)
-            weighted_average_mod = wavg
+
+    # -------------------------
+    # CASE 2: no surplus (sg <= drawl)
+    # -------------------------
     else:
-        # No surplus: sg <= drawl
         if total_backdown_units < banked_units:
-            # Need market purchase for the shortfall
             cycle = "NO_CHARGE"
             upsert_battery_status(timestamp, banked_units, cycle)
-            market_purchase = banked_units - total_backdown_units
-            # total_backdown_cost corresponds to using all available backdown
+
+            market_purchase = round(banked_units - total_backdown_units, 3)
             banking_cost = round(total_backdown_cost + market_purchase * min(dam, rtm), 2)
+
+            if banked_units > 0:
+                weighted_average_mod = round(total_backdown_cost / total_backdown_units, 2)
+
             plants_with_usage = allocate_used_for_quantum_desc(timestamp, total_backdown_units)
+
         else:
-            # Sufficient backdown available; cost is weighted average * banked_units
             cycle = "NO_CHARGE"
             upsert_battery_status(timestamp, banked_units, cycle)
+
             wavg, tot_cost, _ = calculate_weighted_average_for_quantum_prefix(banked_units, timestamp)
-            banking_cost = round(wavg * banked_units, 2)
+            banking_cost = round(tot_cost, 2)  # ✅ use tot_cost directly
             weighted_average_mod = wavg
+
             plants_with_usage = allocate_used_for_quantum_desc(timestamp, banked_units)
 
     return {

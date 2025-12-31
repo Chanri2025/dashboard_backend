@@ -5,13 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="6d3c20e0-234c-4e23-add2-70a4ac09e0c0" name="Changes" comment="Auth Part Added - V">
-      <change beforePath="$PROJECT_DIR$/.env" beforeDir="false" afterPath="$PROJECT_DIR$/.env" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/dashboard_backend.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dashboard_backend.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/dataSources.local.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dataSources/5f89886b-f255-440c-8ddb-b45da6092c55.xml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/routes/consolidated_2.py" beforeDir="false" afterPath="$PROJECT_DIR$/routes/consolidated_2.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -47,7 +45,7 @@
 }</component>
   <component name="GithubPullRequestsUISettings">{
   &quot;selectedUrlAndAccountId&quot;: {
-    &quot;url&quot;: &quot;https://github.com/DMMPrice/dashboard_backend.git&quot;,
+    &quot;url&quot;: &quot;https://github.com/Chanri2025/dashboard_backend.git&quot;,
     &quot;accountId&quot;: &quot;2fe49d37-6ad6-4770-8a41-aee5790864a7&quot;
   }
 }</component>
@@ -130,8 +128,8 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-js-predefined-d6986cc7102b-6a121458b545-JavaScript-PY-251.25410.159" />
-        <option value="bundled-python-sdk-e0ed3721d81e-36ea0e71a18c-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-251.25410.159" />
+        <option value="bundled-js-predefined-d6986cc7102b-09060db00ec0-JavaScript-PY-251.29188.22" />
+        <option value="bundled-python-sdk-1f1b7bcced7d-64d779b69b7a-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-251.29188.22" />
       </set>
     </attachedChunks>
   </component>
@@ -166,6 +164,10 @@
       <workItem from="1758379520339" duration="2191000" />
       <workItem from="1763271195232" duration="590000" />
       <workItem from="1763292646390" duration="1493000" />
+      <workItem from="1766416603823" duration="676000" />
+      <workItem from="1766588350819" duration="293000" />
+      <workItem from="1766765665957" duration="926000" />
+      <workItem from="1767154082535" duration="11874000" />
     </task>
     <task id="LOCAL-00001" summary="Version 2.0 Converted to Fast API">
       <option name="closed" value="true" />
@@ -483,5 +485,13 @@
     <MESSAGE value="Version 0.1 Modifications - IX" />
     <MESSAGE value="Version 0.1 Modifications - X" />
     <option name="LAST_COMMIT_MESSAGE" value="Version 0.1 Modifications - X" />
+  </component>
+  <component name="github-copilot-workspace">
+    <instructionFileLocations>
+      <option value=".github/instructions" />
+    </instructionFileLocations>
+    <promptFileLocations>
+      <option value=".github/prompts" />
+    </promptFileLocations>
   </component>
 </project>
