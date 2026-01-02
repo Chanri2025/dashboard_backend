@@ -4,12 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="6d3c20e0-234c-4e23-add2-70a4ac09e0c0" name="Changes" comment="Auth Part Added - V">
-      <change beforePath="$PROJECT_DIR$/.idea/dashboard_backend.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dashboard_backend.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dataSources.local.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/dataSources.local.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+    <list default="true" id="6d3c20e0-234c-4e23-add2-70a4ac09e0c0" name="Changes" comment="Banking Logic Optimisation on Progress - I">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/routes/consolidated_2.py" beforeDir="false" afterPath="$PROJECT_DIR$/routes/consolidated_2.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -167,7 +163,9 @@
       <workItem from="1766416603823" duration="676000" />
       <workItem from="1766588350819" duration="293000" />
       <workItem from="1766765665957" duration="926000" />
-      <workItem from="1767154082535" duration="11874000" />
+      <workItem from="1767154082535" duration="13176000" />
+      <workItem from="1767195437132" duration="787000" />
+      <workItem from="1767335367427" duration="8000" />
     </task>
     <task id="LOCAL-00001" summary="Version 2.0 Converted to Fast API">
       <option name="closed" value="true" />
@@ -441,7 +439,15 @@
       <option name="project" value="LOCAL" />
       <updated>1758277889807</updated>
     </task>
-    <option name="localTasksCounter" value="35" />
+    <task id="LOCAL-00035" summary="Banking Logic Optimisation on Progress - I">
+      <option name="closed" value="true" />
+      <created>1767184134236</created>
+      <option name="number" value="00035" />
+      <option name="presentableId" value="LOCAL-00035" />
+      <option name="project" value="LOCAL" />
+      <updated>1767184134236</updated>
+    </task>
+    <option name="localTasksCounter" value="36" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -459,7 +465,6 @@
     </option>
   </component>
   <component name="VcsManagerConfiguration">
-    <MESSAGE value="Auth Part Added - X" />
     <MESSAGE value="Auth Part Added - XI" />
     <MESSAGE value="Env minor changes - I" />
     <MESSAGE value="Env minor changes - II" />
@@ -484,7 +489,8 @@
     <MESSAGE value="Version 0.1 Modifications - VIII" />
     <MESSAGE value="Version 0.1 Modifications - IX" />
     <MESSAGE value="Version 0.1 Modifications - X" />
-    <option name="LAST_COMMIT_MESSAGE" value="Version 0.1 Modifications - X" />
+    <MESSAGE value="Banking Logic Optimisation on Progress - I" />
+    <option name="LAST_COMMIT_MESSAGE" value="Banking Logic Optimisation on Progress - I" />
   </component>
   <component name="github-copilot-workspace">
     <instructionFileLocations>

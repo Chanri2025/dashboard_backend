@@ -15,7 +15,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/DMMPrice/dashboard_backend.git'
+                git branch: 'main', url: 'https://github.com/Chanri2025/dashboard_backend.git'
             }
         }
 
