@@ -84,7 +84,6 @@ def calculate_weighted_average_for_quantum_prefix(q, ts):
     weighted_avg = round(total_cost / q, 2)
     return weighted_avg, round(total_cost, 2), round(q, 2)
 
-
 def in_dsm_window(ts):
     t = ts.time()
     return (time(9, 0) <= t < time(11, 0)) or (time(18, 0) <= t < time(20, 0))
@@ -216,17 +215,38 @@ def fetch_mod_from_demand_output(ts):
     return round(rec.get("Last_Price", 0.0) or 0.0, 2)
 
 
+def _to_float(x, default=0.0):
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return default
+
+
+def fallback_mod_from_last_sg_positive(plants_list):
+    # Filter plants where SG > 0
+    sg_positive = []
+    for p in (plants_list or []):
+        sg = _to_float(p.get("SG", 0.0))
+        if sg > 0:
+            sg_positive.append(_to_float(p.get("VC", 0.0)))
+
+    # If none found, return 0
+    if not sg_positive:
+        return 0.0
+
+    # Sort VC ascending and take the last (highest VC)
+    sg_positive.sort()
+    return round(sg_positive[-1], 2)
+
 def compute_totals(plants_list, timestamp):
-    t_units = round(sum(p["backdown_units"] for p in plants_list), 2)
-    t_cost = round(sum(p["backdown_cost"] for p in plants_list), 2)
+    t_units = round(sum(_to_float(p.get("backdown_units", 0.0)) for p in plants_list), 2)
+    t_cost = round(sum(_to_float(p.get("backdown_cost", 0.0)) for p in plants_list), 2)
     wav = round((t_cost / t_units), 2) if t_units > 0 else 0.0
 
-    # ✅ MOD from Demand_Output.Last_Price
     try:
         mod = fetch_mod_from_demand_output(timestamp)
     except LookupError:
-        # fallback: keep old logic
-        mod = round(plants_list[0]["VC"], 2) if plants_list else 0.0
+        mod = fallback_mod_from_last_sg_positive(plants_list)
 
     return t_units, t_cost, wav, mod
 
@@ -332,7 +352,7 @@ def decide_banking(timestamp, banked_units, scheduled_generation, drawl,
             "DSM_units": 0.0,
             "cycle": cycle,
             "units_available_after": units_available_before,
-            "weighted_average": round(weighted_average_mod, 2),
+            "weighted_average": 0.0,
             "market_purchase": 0.0,
             "plants_with_usage": plants_with_usage
         }
@@ -342,6 +362,7 @@ def decide_banking(timestamp, banked_units, scheduled_generation, drawl,
     # -------------------------
     if s_d > 0:
         # 1A: surplus fully covers banked_units
+        weighted_average_mod=0.0
         if s_d >= banked_units:
             if not in_dsm_window(timestamp):
                 cycle = "CHARGE"
